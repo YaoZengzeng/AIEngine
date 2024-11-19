@@ -32,7 +32,7 @@ var (
 
 func main() {
 	flag.IntVar(&port, "port", 9002, "gRPC port")
-	flag.StringVar(&certPath, "certPath", "", "path to extProcServer certificate and private key")
+	flag.StringVar(&certPath, "certPath", "/app/certs/", "path to extProcServer certificate and private key")
 	flag.Parse()
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
