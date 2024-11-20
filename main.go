@@ -35,6 +35,8 @@ func main() {
 	flag.StringVar(&certPath, "certPath", "/app/certs/", "path to extProcServer certificate and private key")
 	flag.Parse()
 
+	log.Printf("Start AI Engine\n")
+
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
@@ -49,40 +51,6 @@ func main() {
 
 	go func() {
 		err = gs.Serve(lis)
-		if err != nil {
-			log.Fatalf("failed to serve: %v", err)
-		}
-	}()
-
-	// Create Unix listener
-	gus := grpc.NewServer(grpc.Creds(creds))
-	envoy_service_proc_v3.RegisterExternalProcessorServer(gus, &extProcServer{})
-
-	udsAddr := "/var/run/ext-proc/extproc.sock"
-	if _, err := os.Stat(udsAddr); err == nil {
-		if err := os.RemoveAll(udsAddr); err != nil {
-			log.Fatalf("failed to remove: %v", err)
-		}
-	}
-
-	ul, err := net.Listen("unix", udsAddr)
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-
-	err = os.Chmod(udsAddr, 0700)
-	if err != nil {
-		log.Fatalf("failed to set permissions: %v", err)
-	}
-
-	// envoy distroless uid
-	err = os.Chown(udsAddr, 65532, 0)
-	if err != nil {
-		log.Fatalf("failed to set permissions: %v", err)
-	}
-
-	go func() {
-		err = gus.Serve(ul)
 		if err != nil {
 			log.Fatalf("failed to serve: %v", err)
 		}
@@ -205,6 +173,8 @@ func (s *extProcServer) Process(srv envoy_service_proc_v3.ExternalProcessor_Proc
 		resp := &envoy_service_proc_v3.ProcessingResponse{}
 		switch v := req.Request.(type) {
 		case *envoy_service_proc_v3.ProcessingRequest_RequestHeaders:
+			log.Printf("Handle Request Headers\n")
+
 			xrch := ""
 			if v.RequestHeaders != nil {
 				hdrs := v.RequestHeaders.Headers.GetHeaders()
@@ -254,6 +224,8 @@ func (s *extProcServer) Process(srv envoy_service_proc_v3.ExternalProcessor_Proc
 			}
 			break
 		case *envoy_service_proc_v3.ProcessingRequest_ResponseHeaders:
+			log.Printf("Handle Response Headers")
+
 			rhq := &envoy_service_proc_v3.HeadersResponse{
 				Response: &envoy_service_proc_v3.CommonResponse{
 					HeaderMutation: &envoy_service_proc_v3.HeaderMutation{
