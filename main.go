@@ -2,18 +2,14 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
-	"os"
-	"strings"
 
-	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 
 	envoy_api_v3_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_service_proc_v3 "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
@@ -26,13 +22,11 @@ import (
 type extProcServer struct{}
 
 var (
-	port     int
-	certPath string
+	port int
 )
 
 func main() {
 	flag.IntVar(&port, "port", 9002, "gRPC port")
-	flag.StringVar(&certPath, "certPath", "/app/certs/", "path to extProcServer certificate and private key")
 	flag.Parse()
 
 	log.Printf("Start AI Engine\n")
@@ -42,11 +36,7 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	creds, err := loadTLSCredentials(certPath)
-	if err != nil {
-		log.Fatalf("Failed to load TLS credentials: %v", err)
-	}
-	gs := grpc.NewServer(grpc.Creds(creds))
+	gs := grpc.NewServer()
 	envoy_service_proc_v3.RegisterExternalProcessorServer(gs, &extProcServer{})
 
 	go func() {
@@ -66,21 +56,7 @@ func main() {
 // used by k8s readiness probes
 // makes a processing request to check if the processor service is healthy
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
-	certPool, err := loadCA(certPath)
-	if err != nil {
-		log.Fatalf("Could not load CA certificate: %v", err)
-	}
-
-	// Create TLS configuration
-	tlsConfig := &tls.Config{
-		RootCAs:    certPool,
-		ServerName: "grpc-ext-proc.envoygateway",
-	}
-
-	// Create gRPC dial options
-	opts := []grpc.DialOption{
-		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
-	}
+	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 
 	conn, err := grpc.Dial("localhost:9002", opts...)
 	if err != nil {
@@ -114,46 +90,6 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func loadTLSCredentials(certPath string) (credentials.TransportCredentials, error) {
-	// Load extProcServer's certificate and private key
-	crt := "server.crt"
-	key := "server.key"
-
-	if certPath != "" {
-		if !strings.HasSuffix(certPath, "/") {
-			certPath = fmt.Sprintf("%s/", certPath)
-		}
-		crt = fmt.Sprintf("%s%s", certPath, crt)
-		key = fmt.Sprintf("%s%s", certPath, key)
-	}
-	certificate, err := tls.LoadX509KeyPair(crt, key)
-	if err != nil {
-		return nil, fmt.Errorf("could not load extProcServer key pair: %s", err)
-	}
-
-	// Create a new credentials object
-	creds := credentials.NewTLS(&tls.Config{Certificates: []tls.Certificate{certificate}})
-
-	return creds, nil
-}
-
-func loadCA(caPath string) (*x509.CertPool, error) {
-	ca := x509.NewCertPool()
-	caCertPath := "server.crt"
-	if caPath != "" {
-		if !strings.HasSuffix(caPath, "/") {
-			caPath = fmt.Sprintf("%s/", caPath)
-		}
-		caCertPath = fmt.Sprintf("%s%s", caPath, caCertPath)
-	}
-	caCert, err := os.ReadFile(caCertPath)
-	if err != nil {
-		return nil, fmt.Errorf("could not read ca certificate: %s", err)
-	}
-	ca.AppendCertsFromPEM(caCert)
-	return ca, nil
-}
-
 func (s *extProcServer) Process(srv envoy_service_proc_v3.ExternalProcessor_ProcessServer) error {
 	ctx := srv.Context()
 	for {
@@ -179,6 +115,7 @@ func (s *extProcServer) Process(srv envoy_service_proc_v3.ExternalProcessor_Proc
 			if v.RequestHeaders != nil {
 				hdrs := v.RequestHeaders.Headers.GetHeaders()
 				for _, hdr := range hdrs {
+					log.Printf("%s:%s\n", hdr.Key, hdr.Value)
 					if hdr.Key == "x-request-client-header" {
 						xrch = string(hdr.RawValue)
 					}
