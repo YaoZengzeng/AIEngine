@@ -13,5 +13,7 @@ spec:
     - name: aiengine
       port: 9002
     processingMode:
-      request: {}
-      response: {}
+      request:
+        body: Buffered
+      response:
+        body: Buffered

@@ -115,7 +115,7 @@ func (s *extProcServer) Process(srv envoy_service_proc_v3.ExternalProcessor_Proc
 			if v.RequestHeaders != nil {
 				hdrs := v.RequestHeaders.Headers.GetHeaders()
 				for _, hdr := range hdrs {
-					log.Printf("%s:%s\n", hdr.Key, hdr.Value)
+					log.Printf("REQUEST HEADER: %s:%s\n", hdr.Key, hdr.Value)
 					if hdr.Key == "x-request-client-header" {
 						xrch = string(hdr.RawValue)
 					}
@@ -160,8 +160,21 @@ func (s *extProcServer) Process(srv envoy_service_proc_v3.ExternalProcessor_Proc
 				},
 			}
 			break
+		case *envoy_service_proc_v3.ProcessingRequest_RequestBody:
+			log.Printf("Handle Request Body")
+			break
+		case *envoy_service_proc_v3.ProcessingRequest_RequestTrailers:
+			log.Printf("Handle Request Trailers")
+			break
 		case *envoy_service_proc_v3.ProcessingRequest_ResponseHeaders:
 			log.Printf("Handle Response Headers")
+
+			if v.ResponseHeaders != nil {
+				hdrs := v.ResponseHeaders.Headers.GetHeaders()
+				for _, hdr := range hdrs {
+					log.Printf("RESPONSE HEADER: %s:%s\n", hdr.Key, hdr.Value)
+				}
+			}
 
 			rhq := &envoy_service_proc_v3.HeadersResponse{
 				Response: &envoy_service_proc_v3.CommonResponse{
@@ -182,6 +195,12 @@ func (s *extProcServer) Process(srv envoy_service_proc_v3.ExternalProcessor_Proc
 					ResponseHeaders: rhq,
 				},
 			}
+			break
+		case *envoy_service_proc_v3.ProcessingRequest_ResponseBody:
+			log.Printf("Handle Response Body")
+			break
+		case *envoy_service_proc_v3.ProcessingRequest_ResponseTrailers:
+			log.Printf("Handle Response Trailers")
 			break
 		default:
 			log.Printf("Unknown Request type %v\n", v)
