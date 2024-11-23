@@ -162,6 +162,20 @@ func (s *extProcServer) Process(srv envoy_service_proc_v3.ExternalProcessor_Proc
 			break
 		case *envoy_service_proc_v3.ProcessingRequest_RequestBody:
 			log.Printf("Handle Request Body")
+			if v.RequestBody != nil {
+				body := v.RequestBody.GetBody()
+				log.Printf("Request BODY: %s", string(body))
+			}
+
+			rbq := &envoy_service_proc_v3.BodyResponse{
+				Response: &envoy_service_proc_v3.CommonResponse{},
+			}
+
+			resp = &envoy_service_proc_v3.ProcessingResponse{
+				Response: &envoy_service_proc_v3.ProcessingResponse_RequestBody{
+					RequestBody: rbq,
+				},
+			}
 			break
 		case *envoy_service_proc_v3.ProcessingRequest_RequestTrailers:
 			log.Printf("Handle Request Trailers")
@@ -198,6 +212,21 @@ func (s *extProcServer) Process(srv envoy_service_proc_v3.ExternalProcessor_Proc
 			break
 		case *envoy_service_proc_v3.ProcessingRequest_ResponseBody:
 			log.Printf("Handle Response Body")
+
+			if v.ResponseBody != nil {
+				body := v.ResponseBody.GetBody()
+				log.Printf("Response BODY: %s", string(body))
+			}
+
+			rbq := &envoy_service_proc_v3.BodyResponse{
+				Response: &envoy_service_proc_v3.CommonResponse{},
+			}
+
+			resp = &envoy_service_proc_v3.ProcessingResponse{
+				Response: &envoy_service_proc_v3.ProcessingResponse_ResponseBody{
+					ResponseBody: rbq,
+				},
+			}
 			break
 		case *envoy_service_proc_v3.ProcessingRequest_ResponseTrailers:
 			log.Printf("Handle Response Trailers")

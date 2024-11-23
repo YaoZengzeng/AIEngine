@@ -16,4 +16,4 @@ spec:
       request:
         body: Buffered
       response:
-        body: Buffered
+        body: Streamed
