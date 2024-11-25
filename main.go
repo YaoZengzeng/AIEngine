@@ -2,24 +2,38 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
+	"time"
 
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/tmc/langchaingo/llms"
+	"golang.org/x/time/rate"
+
 	envoy_api_v3_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_service_proc_v3 "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
+	v32 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-type extProcServer struct{}
+type AIEngine struct {
+	rateLimiter map[string]*rate.Limiter
+}
+
+type Request struct {
+	Model string `json:"model"`
+
+	Prompt string `json:"prompt"`
+}
 
 var (
 	port int
@@ -37,7 +51,7 @@ func main() {
 	}
 
 	gs := grpc.NewServer()
-	envoy_service_proc_v3.RegisterExternalProcessorServer(gs, &extProcServer{})
+	envoy_service_proc_v3.RegisterExternalProcessorServer(gs, &AIEngine{rateLimiter: make(map[string]*rate.Limiter)})
 
 	go func() {
 		err = gs.Serve(lis)
@@ -90,7 +104,7 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *extProcServer) Process(srv envoy_service_proc_v3.ExternalProcessor_ProcessServer) error {
+func (s *AIEngine) Process(srv envoy_service_proc_v3.ExternalProcessor_ProcessServer) error {
 	ctx := srv.Context()
 	for {
 		select {
@@ -162,10 +176,6 @@ func (s *extProcServer) Process(srv envoy_service_proc_v3.ExternalProcessor_Proc
 			break
 		case *envoy_service_proc_v3.ProcessingRequest_RequestBody:
 			log.Printf("Handle Request Body")
-			if v.RequestBody != nil {
-				body := v.RequestBody.GetBody()
-				log.Printf("Request BODY: %s", string(body))
-			}
 
 			rbq := &envoy_service_proc_v3.BodyResponse{
 				Response: &envoy_service_proc_v3.CommonResponse{},
@@ -175,6 +185,37 @@ func (s *extProcServer) Process(srv envoy_service_proc_v3.ExternalProcessor_Proc
 				Response: &envoy_service_proc_v3.ProcessingResponse_RequestBody{
 					RequestBody: rbq,
 				},
+			}
+
+			if v.RequestBody != nil {
+				body := v.RequestBody.GetBody()
+				log.Printf("Request BODY: %s", string(body))
+
+				var req Request
+
+				err := json.Unmarshal(body, &req)
+				if err != nil {
+					log.Printf("Failed to unmarshal req")
+					break
+				}
+
+				if _, ok := s.rateLimiter[req.Model]; !ok {
+					s.rateLimiter[req.Model] = rate.NewLimiter(rate.Every(time.Minute), 10)
+				}
+
+				tokenCount := llms.CountTokens("", req.Prompt)
+				log.Printf("Token Count is %d", tokenCount)
+
+				if allowed := s.rateLimiter[req.Model].AllowN(time.Now(), tokenCount); !allowed {
+					log.Printf("Trigger Rate Limit")
+					resp = &envoy_service_proc_v3.ProcessingResponse{
+						Response: &envoy_service_proc_v3.ProcessingResponse_ImmediateResponse{
+							ImmediateResponse: &envoy_service_proc_v3.ImmediateResponse{
+								Status: &v32.HttpStatus{Code: v32.StatusCode_TooManyRequests},
+							},
+						},
+					}
+				}
 			}
 			break
 		case *envoy_service_proc_v3.ProcessingRequest_RequestTrailers:
