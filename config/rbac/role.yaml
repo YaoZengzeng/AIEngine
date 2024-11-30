@@ -1,0 +1,32 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ai.kmesh.net
+  resources:
+  - aiextensions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ai.kmesh.net
+  resources:
+  - aiextensions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ai.kmesh.net
+  resources:
+  - aiextensions/status
+  verbs:
+  - get
+  - patch
+  - update

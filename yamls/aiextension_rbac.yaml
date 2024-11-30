@@ -1,0 +1,73 @@
+# permissions for end users to edit aiextensions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: aiextension-editor-role
+  namespace: ollama
+rules:
+  - apiGroups:
+      - ai.kmesh.net
+    resources:
+      - aiextensions
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ai.kmesh.net
+    resources:
+      - aiextensions/status
+    verbs:
+      - get
+---
+# permissions for end users to view aiextensions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: aiextension-viewer-role
+  namespace: ollama
+rules:
+  - apiGroups:
+      - ai.kmesh.net
+    resources:
+      - aiextensions
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ai.kmesh.net
+    resources:
+      - aiextensions/status
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: aiextension-viewer-role-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: aiextension-viewer-role
+subjects:
+  - kind: ServiceAccount
+    name: aiengine
+    namespace: ollama
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: aiextension-editor-role-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: aiextension-editor-role
+subjects:
+  - kind: ServiceAccount
+    name: aiengine
+    namespace: ollama
