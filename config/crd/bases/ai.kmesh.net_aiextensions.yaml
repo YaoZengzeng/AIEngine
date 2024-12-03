@@ -39,10 +39,27 @@ spec:
           spec:
             description: AIExtensionSpec defines the desired state of AIExtension.
             properties:
-              foo:
-                description: Foo is an example field of AIExtension. Edit aiextension_types.go
-                  to remove/update
-                type: string
+              options:
+                properties:
+                  rateLimits:
+                    items:
+                      properties:
+                        model:
+                          type: string
+                        requestsPerUnit:
+                          format: int32
+                          type: integer
+                        unit:
+                          type: string
+                      required:
+                      - model
+                      - requestsPerUnit
+                      - unit
+                      type: object
+                    type: array
+                type: object
+            required:
+            - options
             type: object
           status:
             description: AIExtensionStatus defines the observed state of AIExtension.

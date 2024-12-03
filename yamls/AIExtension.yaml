@@ -1,0 +1,11 @@
+apiVersion: ai.kmesh.net/v1alpha1
+kind: AIExtension
+metadata:
+  name: ai-extensions
+  namespace: ollama
+spec:
+  options:
+    rateLimits:
+      - requestsPerUnit: 10
+        unit: MINUTE
+        model: llama3.2

@@ -20,22 +20,23 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // AIExtensionSpec defines the desired state of AIExtension.
 type AIExtensionSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Options Options `json:"options"`
+}
 
-	// Foo is an example field of AIExtension. Edit aiextension_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+type Options struct {
+	RateLimits []RateLimit `json:"rateLimits,omitempty"`
+}
+
+type RateLimit struct {
+	RequestsPerUnit uint32 `json:"requestsPerUnit"`
+	Unit            string `json:"unit"`
+	Model           string `json:"model"`
 }
 
 // AIExtensionStatus defines the observed state of AIExtension.
 type AIExtensionStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
 }
 
 // +kubebuilder:object:root=true

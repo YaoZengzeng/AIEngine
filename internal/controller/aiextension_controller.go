@@ -47,9 +47,16 @@ type AIExtensionReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.1/pkg/reconcile
 func (r *AIExtensionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	log := log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	var extension aiv1alpha1.AIExtension
+	if err := r.Get(ctx, req.NamespacedName, &extension); err != nil {
+		log.Error(err, "unable to fetch AIExtension")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	rateLimit := extension.Spec.Options.RateLimits[0]
+	log.V(1).Info("Get AI extension", "requests Per Unit", rateLimit.RequestsPerUnit, "unit", rateLimit.Unit, "model", rateLimit.Model)
 
 	return ctrl.Result{}, nil
 }
