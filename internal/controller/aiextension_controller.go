@@ -18,7 +18,18 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"time"
 
+	envoy_api_v3_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	envoy_service_proc_v3 "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
+	v32 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
+	"github.com/tmc/langchaingo/llms"
+	"golang.org/x/time/rate"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -31,6 +42,8 @@ import (
 type AIExtensionReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+
+	RateLimiter map[string]*rate.Limiter
 }
 
 // +kubebuilder:rbac:groups=ai.kmesh.net,resources=aiextensions,verbs=get;list;watch;create;update;patch;delete
@@ -57,6 +70,9 @@ func (r *AIExtensionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	rateLimit := extension.Spec.Options.RateLimits[0]
 	log.V(1).Info("Get AI extension", "requests Per Unit", rateLimit.RequestsPerUnit, "unit", rateLimit.Unit, "model", rateLimit.Model)
+	if _, ok := r.RateLimiter[rateLimit.Model]; !ok {
+		r.RateLimiter[rateLimit.Model] = rate.NewLimiter(rate.Every(time.Minute), int(rateLimit.RequestsPerUnit))
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -67,4 +83,188 @@ func (r *AIExtensionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&aiv1alpha1.AIExtension{}).
 		Named("aiextension").
 		Complete(r)
+}
+
+type Request struct {
+	Model string `json:"model"`
+
+	Prompt string `json:"prompt"`
+}
+
+func (r *AIExtensionReconciler) Process(srv envoy_service_proc_v3.ExternalProcessor_ProcessServer) error {
+	ctx := srv.Context()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		req, err := srv.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return status.Errorf(codes.Unknown, "cannot receive stream request: %v", err)
+		}
+
+		resp := &envoy_service_proc_v3.ProcessingResponse{}
+		switch v := req.Request.(type) {
+		case *envoy_service_proc_v3.ProcessingRequest_RequestHeaders:
+			fmt.Printf("Handle Request Headers\n")
+
+			xrch := ""
+			if v.RequestHeaders != nil {
+				hdrs := v.RequestHeaders.Headers.GetHeaders()
+				for _, hdr := range hdrs {
+					fmt.Printf("REQUEST HEADER: %s:%s\n", hdr.Key, hdr.Value)
+					if hdr.Key == "x-request-client-header" {
+						xrch = string(hdr.RawValue)
+					}
+				}
+			}
+
+			rhq := &envoy_service_proc_v3.HeadersResponse{
+				Response: &envoy_service_proc_v3.CommonResponse{
+					HeaderMutation: &envoy_service_proc_v3.HeaderMutation{
+						SetHeaders: []*envoy_api_v3_core.HeaderValueOption{
+							{
+								Header: &envoy_api_v3_core.HeaderValue{
+									Key:      "x-request-ext-processed",
+									RawValue: []byte("true"),
+								},
+							},
+						},
+					},
+				},
+			}
+
+			if xrch != "" {
+				rhq.Response.HeaderMutation.SetHeaders = append(rhq.Response.HeaderMutation.SetHeaders,
+					&envoy_api_v3_core.HeaderValueOption{
+						Header: &envoy_api_v3_core.HeaderValue{
+							Key:      "x-request-client-header",
+							RawValue: []byte("mutated"),
+						},
+					})
+				rhq.Response.HeaderMutation.SetHeaders = append(rhq.Response.HeaderMutation.SetHeaders,
+					&envoy_api_v3_core.HeaderValueOption{
+						Header: &envoy_api_v3_core.HeaderValue{
+							Key:      "x-request-client-header-received",
+							RawValue: []byte(xrch),
+						},
+					})
+			}
+
+			resp = &envoy_service_proc_v3.ProcessingResponse{
+				Response: &envoy_service_proc_v3.ProcessingResponse_RequestHeaders{
+					RequestHeaders: rhq,
+				},
+			}
+			break
+		case *envoy_service_proc_v3.ProcessingRequest_RequestBody:
+			fmt.Printf("Handle Request Body")
+
+			rbq := &envoy_service_proc_v3.BodyResponse{
+				Response: &envoy_service_proc_v3.CommonResponse{},
+			}
+
+			resp = &envoy_service_proc_v3.ProcessingResponse{
+				Response: &envoy_service_proc_v3.ProcessingResponse_RequestBody{
+					RequestBody: rbq,
+				},
+			}
+
+			if v.RequestBody != nil {
+				body := v.RequestBody.GetBody()
+				fmt.Printf("Request BODY: %s", string(body))
+
+				var req Request
+
+				err := json.Unmarshal(body, &req)
+				if err != nil {
+					fmt.Printf("Failed to unmarshal req")
+					break
+				}
+
+				if _, ok := r.RateLimiter[req.Model]; !ok {
+					// The model is not configured with a rate limit.
+					break
+				}
+
+				tokenCount := llms.CountTokens("", req.Prompt)
+				fmt.Printf("Token Count is %d", tokenCount)
+
+				if allowed := r.RateLimiter[req.Model].AllowN(time.Now(), tokenCount); !allowed {
+					fmt.Printf("Trigger Rate Limit")
+					resp = &envoy_service_proc_v3.ProcessingResponse{
+						Response: &envoy_service_proc_v3.ProcessingResponse_ImmediateResponse{
+							ImmediateResponse: &envoy_service_proc_v3.ImmediateResponse{
+								Status: &v32.HttpStatus{Code: v32.StatusCode_TooManyRequests},
+							},
+						},
+					}
+				}
+			}
+			break
+		case *envoy_service_proc_v3.ProcessingRequest_RequestTrailers:
+			fmt.Printf("Handle Request Trailers")
+			break
+		case *envoy_service_proc_v3.ProcessingRequest_ResponseHeaders:
+			fmt.Printf("Handle Response Headers")
+
+			if v.ResponseHeaders != nil {
+				hdrs := v.ResponseHeaders.Headers.GetHeaders()
+				for _, hdr := range hdrs {
+					fmt.Printf("RESPONSE HEADER: %s:%s\n", hdr.Key, hdr.Value)
+				}
+			}
+
+			rhq := &envoy_service_proc_v3.HeadersResponse{
+				Response: &envoy_service_proc_v3.CommonResponse{
+					HeaderMutation: &envoy_service_proc_v3.HeaderMutation{
+						SetHeaders: []*envoy_api_v3_core.HeaderValueOption{
+							{
+								Header: &envoy_api_v3_core.HeaderValue{
+									Key:      "x-response-ext-processed",
+									RawValue: []byte("true"),
+								},
+							},
+						},
+					},
+				},
+			}
+			resp = &envoy_service_proc_v3.ProcessingResponse{
+				Response: &envoy_service_proc_v3.ProcessingResponse_ResponseHeaders{
+					ResponseHeaders: rhq,
+				},
+			}
+			break
+		case *envoy_service_proc_v3.ProcessingRequest_ResponseBody:
+			fmt.Printf("Handle Response Body")
+
+			if v.ResponseBody != nil {
+				body := v.ResponseBody.GetBody()
+				fmt.Printf("Response BODY: %s", string(body))
+			}
+
+			rbq := &envoy_service_proc_v3.BodyResponse{
+				Response: &envoy_service_proc_v3.CommonResponse{},
+			}
+
+			resp = &envoy_service_proc_v3.ProcessingResponse{
+				Response: &envoy_service_proc_v3.ProcessingResponse_ResponseBody{
+					ResponseBody: rbq,
+				},
+			}
+			break
+		case *envoy_service_proc_v3.ProcessingRequest_ResponseTrailers:
+			fmt.Printf("Handle Response Trailers")
+			break
+		default:
+			fmt.Printf("Unknown Request type %v\n", v)
+		}
+		if err := srv.Send(resp); err != nil {
+			fmt.Printf("send error %v", err)
+		}
+	}
 }
