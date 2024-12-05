@@ -27,7 +27,6 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 
-	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
@@ -45,6 +44,7 @@ import (
 
 	aiv1alpha1 "AIEngine/api/v1alpha1"
 	"AIEngine/internal/controller"
+	"AIEngine/internal/limiter"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -156,7 +156,7 @@ func main() {
 	controller := &controller.AIExtensionReconciler{
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
-		RateLimiter: make(map[string]*rate.Limiter),
+		RateLimiter: make(map[string]limiter.RateLimiter),
 	}
 
 	if err = controller.SetupWithManager(mgr); err != nil {

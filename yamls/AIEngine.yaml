@@ -19,6 +19,9 @@ spec:
           image: ghcr.io/yaozengzeng/aiengine:latest
           command:
             - /manager
+          env:
+            - name: REDIS_URL
+              value: redis:6379
           args:
             - --leader-elect
             - --health-probe-bind-address=:8081

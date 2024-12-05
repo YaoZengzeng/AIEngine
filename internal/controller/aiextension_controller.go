@@ -21,13 +21,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"time"
 
 	envoy_api_v3_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_service_proc_v3 "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	v32 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"github.com/tmc/langchaingo/llms"
-	"golang.org/x/time/rate"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,6 +34,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	aiv1alpha1 "AIEngine/api/v1alpha1"
+	"AIEngine/internal/limiter"
+	"AIEngine/internal/limiter/redis"
 )
 
 // AIExtensionReconciler reconciles a AIExtension object
@@ -43,7 +43,7 @@ type AIExtensionReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	RateLimiter map[string]*rate.Limiter
+	RateLimiter map[string]limiter.RateLimiter
 }
 
 // +kubebuilder:rbac:groups=ai.kmesh.net,resources=aiextensions,verbs=get;list;watch;create;update;patch;delete
@@ -71,7 +71,12 @@ func (r *AIExtensionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	rateLimit := extension.Spec.Options.RateLimits[0]
 	log.V(1).Info("Get AI extension", "requests Per Unit", rateLimit.RequestsPerUnit, "unit", rateLimit.Unit, "model", rateLimit.Model)
 	if _, ok := r.RateLimiter[rateLimit.Model]; !ok {
-		r.RateLimiter[rateLimit.Model] = rate.NewLimiter(rate.Every(time.Minute), int(rateLimit.RequestsPerUnit))
+		l, err := redis.NewRateLimiter()
+		if err != nil {
+			log.Error(err, "failed to construct rate limiter")
+			return ctrl.Result{}, err
+		}
+		r.RateLimiter[rateLimit.Model] = l
 	}
 
 	return ctrl.Result{}, nil
@@ -194,7 +199,7 @@ func (r *AIExtensionReconciler) Process(srv envoy_service_proc_v3.ExternalProces
 				tokenCount := llms.CountTokens("", req.Prompt)
 				fmt.Printf("Token Count is %d", tokenCount)
 
-				if allowed := r.RateLimiter[req.Model].AllowN(time.Now(), tokenCount); !allowed {
+				if allowed := r.RateLimiter[req.Model].DoLimit(req.Model, tokenCount); !allowed {
 					fmt.Printf("Trigger Rate Limit")
 					resp = &envoy_service_proc_v3.ProcessingResponse{
 						Response: &envoy_service_proc_v3.ProcessingResponse_ImmediateResponse{
