@@ -35,7 +35,6 @@ import (
 
 	aiv1alpha1 "AIEngine/api/v1alpha1"
 	"AIEngine/internal/limiter"
-	"AIEngine/internal/limiter/redis"
 )
 
 // AIExtensionReconciler reconciles a AIExtension object
@@ -43,7 +42,7 @@ type AIExtensionReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	RateLimiter map[string]limiter.RateLimiter
+	RateLimiter limiter.RateLimiter
 }
 
 // +kubebuilder:rbac:groups=ai.kmesh.net,resources=aiextensions,verbs=get;list;watch;create;update;patch;delete
@@ -70,13 +69,9 @@ func (r *AIExtensionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	rateLimit := extension.Spec.Options.RateLimits[0]
 	log.V(1).Info("Get AI extension", "requests Per Unit", rateLimit.RequestsPerUnit, "unit", rateLimit.Unit, "model", rateLimit.Model)
-	if _, ok := r.RateLimiter[rateLimit.Model]; !ok {
-		l, err := redis.NewRateLimiter()
-		if err != nil {
-			log.Error(err, "failed to construct rate limiter")
-			return ctrl.Result{}, err
-		}
-		r.RateLimiter[rateLimit.Model] = l
+	if err := r.RateLimiter.UpdateConfig(&limiter.RateLimitConfig{Model: rateLimit.Model, RequestsPerUnit: rateLimit.RequestsPerUnit, Unit: rateLimit.Unit}); err != nil {
+		log.Error(err, "failed to update config of RateLimiter")
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
@@ -167,7 +162,7 @@ func (r *AIExtensionReconciler) Process(srv envoy_service_proc_v3.ExternalProces
 			}
 			break
 		case *envoy_service_proc_v3.ProcessingRequest_RequestBody:
-			fmt.Printf("Handle Request Body")
+			fmt.Printf("Handle Request Body\n")
 
 			rbq := &envoy_service_proc_v3.BodyResponse{
 				Response: &envoy_service_proc_v3.CommonResponse{},
@@ -191,16 +186,11 @@ func (r *AIExtensionReconciler) Process(srv envoy_service_proc_v3.ExternalProces
 					break
 				}
 
-				if _, ok := r.RateLimiter[req.Model]; !ok {
-					// The model is not configured with a rate limit.
-					break
-				}
-
 				tokenCount := llms.CountTokens("", req.Prompt)
-				fmt.Printf("Token Count is %d", tokenCount)
+				fmt.Printf("Token Count is %d\n", tokenCount)
 
-				if allowed := r.RateLimiter[req.Model].DoLimit(req.Model, tokenCount); !allowed {
-					fmt.Printf("Trigger Rate Limit")
+				if allowed := r.RateLimiter.DoLimit(req.Model, tokenCount); !allowed {
+					fmt.Printf("Trigger Rate Limit\n")
 					resp = &envoy_service_proc_v3.ProcessingResponse{
 						Response: &envoy_service_proc_v3.ProcessingResponse_ImmediateResponse{
 							ImmediateResponse: &envoy_service_proc_v3.ImmediateResponse{

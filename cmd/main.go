@@ -44,7 +44,7 @@ import (
 
 	aiv1alpha1 "AIEngine/api/v1alpha1"
 	"AIEngine/internal/controller"
-	"AIEngine/internal/limiter"
+	"AIEngine/internal/limiter/redis"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -153,10 +153,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	limiter, err := redis.NewRateLimiter()
+	if err != nil {
+		setupLog.Error(err, "unable to construct rate limiter")
+		os.Exit(1)
+	}
+
 	controller := &controller.AIExtensionReconciler{
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
-		RateLimiter: make(map[string]limiter.RateLimiter),
+		RateLimiter: limiter,
 	}
 
 	if err = controller.SetupWithManager(mgr); err != nil {
