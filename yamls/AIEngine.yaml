@@ -23,7 +23,6 @@ spec:
             - name: REDIS_URL
               value: redis:6379
           args:
-            - --leader-elect
             - --health-probe-bind-address=:8081
           livenessProbe:
             httpGet:
@@ -59,58 +58,3 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: aiengine
   namespace: ollama
----
-# permissions to do leader election.
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: leader-election-role
-  namespace: ollama
-rules:
-  - apiGroups:
-      - ""
-    resources:
-      - configmaps
-    verbs:
-      - get
-      - list
-      - watch
-      - create
-      - update
-      - patch
-      - delete
-  - apiGroups:
-      - coordination.k8s.io
-    resources:
-      - leases
-    verbs:
-      - get
-      - list
-      - watch
-      - create
-      - update
-      - patch
-      - delete
-  - apiGroups:
-      - ""
-    resources:
-      - events
-    verbs:
-      - create
-      - patch
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: leader-election-rolebinding
-  namespace: ollama
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: leader-election-role
-subjects:
-  - kind: ServiceAccount
-    name: aiengine
-    namespace: ollama
----
-
