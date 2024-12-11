@@ -42,13 +42,14 @@ func NewRateLimiter() (limiter.RateLimiter, error) {
 }
 
 func (r *rateLimitImpl) DoLimit(model string, tokens int) bool {
-	var limit uint32
+	var limit, unit uint32
 	r.mutex.RLock()
 	if _, ok := r.configs[model]; !ok {
 		r.mutex.RUnlock()
 		return true
 	} else {
 		limit = r.configs[model].RequestsPerUnit
+		unit = parseUnit(r.configs[model].Unit)
 		r.mutex.RUnlock()
 	}
 
@@ -67,7 +68,7 @@ func (r *rateLimitImpl) DoLimit(model string, tokens int) bool {
 		return true
 	}
 
-	if err := r.client.Do(radix.FlatCmd(nil, "EXPIRE", model, 60)); err != nil {
+	if err := r.client.Do(radix.FlatCmd(nil, "EXPIRE", model, unit)); err != nil {
 		fmt.Printf("Failed to set expire time of model %s from redis\n", model)
 		return true
 	}
@@ -83,4 +84,22 @@ func (r *rateLimitImpl) UpdateConfig(config *limiter.RateLimitConfig) error {
 	r.configs[config.Model] = config
 
 	return nil
+}
+
+func parseUnit(unit string) uint32 {
+	var res uint32
+	switch unit {
+	case "second":
+		res = 1
+	case "minute":
+		res = 60
+	case "hour":
+		res = 60 * 60
+	case "day":
+		res = 60 * 60 * 24
+	case "month":
+		res = 60 * 60 * 24 * 30
+	}
+
+	return res
 }

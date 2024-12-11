@@ -69,7 +69,7 @@ func (r *AIExtensionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	rateLimit := extension.Spec.Options.RateLimits[0]
 	log.V(1).Info("Get AI extension", "requests Per Unit", rateLimit.RequestsPerUnit, "unit", rateLimit.Unit, "model", rateLimit.Model)
-	if err := r.RateLimiter.UpdateConfig(&limiter.RateLimitConfig{Model: rateLimit.Model, RequestsPerUnit: rateLimit.RequestsPerUnit, Unit: rateLimit.Unit}); err != nil {
+	if err := r.RateLimiter.UpdateConfig(&limiter.RateLimitConfig{Model: rateLimit.Model, RequestsPerUnit: rateLimit.RequestsPerUnit, Unit: string(rateLimit.Unit)}); err != nil {
 		log.Error(err, "failed to update config of RateLimiter")
 		return ctrl.Result{}, err
 	}

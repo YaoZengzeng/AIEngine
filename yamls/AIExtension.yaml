@@ -7,5 +7,5 @@ spec:
   options:
     rateLimits:
       - requestsPerUnit: 10
-        unit: MINUTE
+        unit: minute
         model: llama3.2

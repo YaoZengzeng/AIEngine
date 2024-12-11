@@ -50,6 +50,12 @@ spec:
                           format: int32
                           type: integer
                         unit:
+                          enum:
+                          - second
+                          - minute
+                          - hour
+                          - day
+                          - month
                           type: string
                       required:
                       - model
