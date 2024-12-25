@@ -13,7 +13,7 @@ type rateLimitImpl struct {
 	client radix.Client
 
 	mutex   sync.RWMutex
-	configs map[string]*limiter.RateLimitConfig
+	configs map[string]map[string]*limiter.RateLimitConfig
 }
 
 func NewRateLimiter() (limiter.RateLimiter, error) {
@@ -37,25 +37,34 @@ func NewRateLimiter() (limiter.RateLimiter, error) {
 
 	return &rateLimitImpl{
 		client:  client,
-		configs: make(map[string]*limiter.RateLimitConfig),
+		configs: make(map[string]map[string]*limiter.RateLimitConfig),
 	}, nil
 }
 
-func (r *rateLimitImpl) DoLimit(model string, tokens int) bool {
+func (r *rateLimitImpl) DoLimit(hostname string, model string, tokens int) bool {
 	var limit, unit uint32
 	r.mutex.RLock()
-	if _, ok := r.configs[model]; !ok {
+	if _, ok := r.configs[hostname]; !ok {
+		fmt.Printf("DoLimit: hostname %s not found in configs\n", hostname)
 		r.mutex.RUnlock()
 		return true
 	} else {
-		limit = r.configs[model].RequestsPerUnit
-		unit = parseUnit(r.configs[model].Unit)
-		r.mutex.RUnlock()
+		if _, ok := r.configs[hostname][model]; !ok {
+			fmt.Printf("DoLimit: model %s not found in configs\n", model)
+			r.mutex.RUnlock()
+			return true
+		} else {
+			limit = r.configs[hostname][model].RequestsPerUnit
+			unit = parseUnit(r.configs[hostname][model].Unit)
+			r.mutex.RUnlock()
+		}
 	}
 
+	key := hostname + ":" + model
+
 	var cnt int
-	if err := r.client.Do(radix.Cmd(&cnt, "GET", model)); err != nil {
-		fmt.Printf("Failed to get current count of model %s from redis\n", model)
+	if err := r.client.Do(radix.Cmd(&cnt, "GET", key)); err != nil {
+		fmt.Printf("Failed to get current count of model %s in hostname %s from redis\n", model, hostname)
 		return true
 	}
 
@@ -63,13 +72,13 @@ func (r *rateLimitImpl) DoLimit(model string, tokens int) bool {
 		return false
 	}
 
-	if err := r.client.Do(radix.FlatCmd(nil, "INCRBY", model, tokens)); err != nil {
-		fmt.Printf("Failed to update count of model %s from redis\n", model)
+	if err := r.client.Do(radix.FlatCmd(nil, "INCRBY", key, tokens)); err != nil {
+		fmt.Printf("Failed to update count of model %s in hostname %s from redis\n", model, hostname)
 		return true
 	}
 
-	if err := r.client.Do(radix.FlatCmd(nil, "EXPIRE", model, unit)); err != nil {
-		fmt.Printf("Failed to set expire time of model %s from redis\n", model)
+	if err := r.client.Do(radix.FlatCmd(nil, "EXPIRE", key, unit)); err != nil {
+		fmt.Printf("Failed to set expire time of model %s in hostname %s from redis\n", model, hostname)
 		return true
 	}
 
@@ -81,7 +90,11 @@ func (r *rateLimitImpl) UpdateConfig(config *limiter.RateLimitConfig) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	r.configs[config.Model] = config
+	if _, ok := r.configs[config.Hostname]; !ok {
+		r.configs[config.Hostname] = make(map[string]*limiter.RateLimitConfig)
+	}
+
+	r.configs[config.Hostname][config.Model] = config
 
 	return nil
 }

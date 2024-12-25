@@ -68,8 +68,8 @@ func (r *AIExtensionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	rateLimit := extension.Spec.Options.RateLimits[0]
-	log.V(1).Info("Get AI extension", "requests Per Unit", rateLimit.RequestsPerUnit, "unit", rateLimit.Unit, "model", rateLimit.Model)
-	if err := r.RateLimiter.UpdateConfig(&limiter.RateLimitConfig{Model: rateLimit.Model, RequestsPerUnit: rateLimit.RequestsPerUnit, Unit: string(rateLimit.Unit)}); err != nil {
+	log.V(1).Info("Get AI extension", "requests Per Unit", rateLimit.RequestsPerUnit, "unit", rateLimit.Unit, "model", rateLimit.Model, "hostname", extension.Spec.Hostname)
+	if err := r.RateLimiter.UpdateConfig(&limiter.RateLimitConfig{Hostname: extension.Spec.Hostname, Model: rateLimit.Model, RequestsPerUnit: rateLimit.RequestsPerUnit, Unit: string(rateLimit.Unit)}); err != nil {
 		log.Error(err, "failed to update config of RateLimiter")
 		return ctrl.Result{}, err
 	}
@@ -92,6 +92,8 @@ type Request struct {
 }
 
 func (r *AIExtensionReconciler) Process(srv envoy_service_proc_v3.ExternalProcessor_ProcessServer) error {
+	fmt.Printf("--- Calling AIExtensionReconciler Process\n")
+	host := ""
 	ctx := srv.Context()
 	for {
 		select {
@@ -101,6 +103,7 @@ func (r *AIExtensionReconciler) Process(srv envoy_service_proc_v3.ExternalProces
 		}
 		req, err := srv.Recv()
 		if err == io.EOF {
+			fmt.Printf("--- Recv() get EOF, Exit AIExtensionReconciler Process")
 			return nil
 		}
 		if err != nil {
@@ -112,16 +115,17 @@ func (r *AIExtensionReconciler) Process(srv envoy_service_proc_v3.ExternalProces
 		case *envoy_service_proc_v3.ProcessingRequest_RequestHeaders:
 			fmt.Printf("Handle Request Headers\n")
 
-			xrch := ""
 			if v.RequestHeaders != nil {
 				hdrs := v.RequestHeaders.Headers.GetHeaders()
 				for _, hdr := range hdrs {
-					fmt.Printf("REQUEST HEADER: %s:%s\n", hdr.Key, hdr.Value)
-					if hdr.Key == "x-request-client-header" {
-						xrch = string(hdr.RawValue)
+					fmt.Printf("REQUEST HEADER: %s, Value: %s, RawValue: %s\n", hdr.Key, hdr.Value, string(hdr.RawValue))
+					if hdr.Key == ":authority" {
+						host = string(hdr.RawValue)
 					}
 				}
 			}
+
+			fmt.Printf("Request Headder: Attributes are %v\n", v.RequestHeaders.Attributes)
 
 			rhq := &envoy_service_proc_v3.HeadersResponse{
 				Response: &envoy_service_proc_v3.CommonResponse{
@@ -138,29 +142,11 @@ func (r *AIExtensionReconciler) Process(srv envoy_service_proc_v3.ExternalProces
 				},
 			}
 
-			if xrch != "" {
-				rhq.Response.HeaderMutation.SetHeaders = append(rhq.Response.HeaderMutation.SetHeaders,
-					&envoy_api_v3_core.HeaderValueOption{
-						Header: &envoy_api_v3_core.HeaderValue{
-							Key:      "x-request-client-header",
-							RawValue: []byte("mutated"),
-						},
-					})
-				rhq.Response.HeaderMutation.SetHeaders = append(rhq.Response.HeaderMutation.SetHeaders,
-					&envoy_api_v3_core.HeaderValueOption{
-						Header: &envoy_api_v3_core.HeaderValue{
-							Key:      "x-request-client-header-received",
-							RawValue: []byte(xrch),
-						},
-					})
-			}
-
 			resp = &envoy_service_proc_v3.ProcessingResponse{
 				Response: &envoy_service_proc_v3.ProcessingResponse_RequestHeaders{
 					RequestHeaders: rhq,
 				},
 			}
-			break
 		case *envoy_service_proc_v3.ProcessingRequest_RequestBody:
 			fmt.Printf("Handle Request Body\n")
 
@@ -176,7 +162,7 @@ func (r *AIExtensionReconciler) Process(srv envoy_service_proc_v3.ExternalProces
 
 			if v.RequestBody != nil {
 				body := v.RequestBody.GetBody()
-				fmt.Printf("Request BODY: %s", string(body))
+				fmt.Printf("Request BODY: %s\nEnd of Stream is %v\n", string(body), v.RequestBody.EndOfStream)
 
 				var req Request
 
@@ -187,9 +173,9 @@ func (r *AIExtensionReconciler) Process(srv envoy_service_proc_v3.ExternalProces
 				}
 
 				tokenCount := llms.CountTokens("", req.Prompt)
-				fmt.Printf("Token Count is %d\n", tokenCount)
+				fmt.Printf("Token Count is %d, DoLimit host: %s, model: %s\n", tokenCount, host, req.Model)
 
-				if allowed := r.RateLimiter.DoLimit(req.Model, tokenCount); !allowed {
+				if allowed := r.RateLimiter.DoLimit(host, req.Model, tokenCount); !allowed {
 					fmt.Printf("Trigger Rate Limit\n")
 					resp = &envoy_service_proc_v3.ProcessingResponse{
 						Response: &envoy_service_proc_v3.ProcessingResponse_ImmediateResponse{
@@ -200,12 +186,10 @@ func (r *AIExtensionReconciler) Process(srv envoy_service_proc_v3.ExternalProces
 					}
 				}
 			}
-			break
 		case *envoy_service_proc_v3.ProcessingRequest_RequestTrailers:
-			fmt.Printf("Handle Request Trailers")
-			break
+			fmt.Printf("Handle Request Trailers\n")
 		case *envoy_service_proc_v3.ProcessingRequest_ResponseHeaders:
-			fmt.Printf("Handle Response Headers")
+			fmt.Printf("Handle Response Headers\n")
 
 			if v.ResponseHeaders != nil {
 				hdrs := v.ResponseHeaders.Headers.GetHeaders()
@@ -233,13 +217,16 @@ func (r *AIExtensionReconciler) Process(srv envoy_service_proc_v3.ExternalProces
 					ResponseHeaders: rhq,
 				},
 			}
-			break
 		case *envoy_service_proc_v3.ProcessingRequest_ResponseBody:
-			fmt.Printf("Handle Response Body")
+			fmt.Printf("Handle Response Body\n")
 
 			if v.ResponseBody != nil {
 				body := v.ResponseBody.GetBody()
-				fmt.Printf("Response BODY: %s", string(body))
+				fmt.Printf("Response BODY: %s\nEnd of Stream is %v\n", string(body), v.ResponseBody.EndOfStream)
+			}
+
+			if v.ResponseBody.EndOfStream {
+				return nil
 			}
 
 			rbq := &envoy_service_proc_v3.BodyResponse{
@@ -251,10 +238,8 @@ func (r *AIExtensionReconciler) Process(srv envoy_service_proc_v3.ExternalProces
 					ResponseBody: rbq,
 				},
 			}
-			break
 		case *envoy_service_proc_v3.ProcessingRequest_ResponseTrailers:
-			fmt.Printf("Handle Response Trailers")
-			break
+			fmt.Printf("Handle Response Trailers\n")
 		default:
 			fmt.Printf("Unknown Request type %v\n", v)
 		}
@@ -262,4 +247,5 @@ func (r *AIExtensionReconciler) Process(srv envoy_service_proc_v3.ExternalProces
 			fmt.Printf("send error %v", err)
 		}
 	}
+
 }

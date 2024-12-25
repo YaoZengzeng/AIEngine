@@ -8,6 +8,9 @@ spec:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       name: ollama
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: ollama-test
   extProc:
   - backendRefs:
     - name: aiengine

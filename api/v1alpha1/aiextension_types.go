@@ -22,7 +22,8 @@ import (
 
 // AIExtensionSpec defines the desired state of AIExtension.
 type AIExtensionSpec struct {
-	Options Options `json:"options"`
+	Hostname string  `json:"hostname"`
+	Options  Options `json:"options"`
 }
 
 type Options struct {

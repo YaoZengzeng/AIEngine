@@ -4,6 +4,7 @@ metadata:
   name: ai-extensions
   namespace: ollama
 spec:
+  hostname: www.ollama.com
   options:
     rateLimits:
       - requestsPerUnit: 10
