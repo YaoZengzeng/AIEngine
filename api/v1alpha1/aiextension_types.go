@@ -42,9 +42,9 @@ const (
 )
 
 type RateLimit struct {
-	RequestsPerUnit uint32        `json:"requestsPerUnit"`
-	Unit            RateLimitUnit `json:"unit"`
-	Model           string        `json:"model"`
+	TokensPerUnit uint32        `json:"tokensPerUnit"`
+	Unit          RateLimitUnit `json:"unit"`
+	Model         string        `json:"model"`
 }
 
 // AIExtensionStatus defines the observed state of AIExtension.

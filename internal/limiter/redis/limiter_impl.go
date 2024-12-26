@@ -54,7 +54,7 @@ func (r *rateLimitImpl) DoLimit(hostname string, model string, tokens int) bool 
 			r.mutex.RUnlock()
 			return true
 		} else {
-			limit = r.configs[hostname][model].RequestsPerUnit
+			limit = r.configs[hostname][model].TokensPerUnit
 			unit = parseUnit(r.configs[hostname][model].Unit)
 			r.mutex.RUnlock()
 		}

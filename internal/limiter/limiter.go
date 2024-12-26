@@ -6,8 +6,8 @@ type RateLimiter interface {
 }
 
 type RateLimitConfig struct {
-	Hostname        string
-	Model           string
-	RequestsPerUnit uint32
-	Unit            string
+	Hostname      string
+	Model         string
+	TokensPerUnit uint32
+	Unit          string
 }

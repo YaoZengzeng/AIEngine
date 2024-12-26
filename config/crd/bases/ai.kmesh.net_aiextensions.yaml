@@ -48,7 +48,7 @@ spec:
                       properties:
                         model:
                           type: string
-                        requestsPerUnit:
+                        tokensPerUnit:
                           format: int32
                           type: integer
                         unit:
@@ -61,7 +61,7 @@ spec:
                           type: string
                       required:
                       - model
-                      - requestsPerUnit
+                      - tokensPerUnit
                       - unit
                       type: object
                     type: array

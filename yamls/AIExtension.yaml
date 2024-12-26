@@ -7,6 +7,6 @@ spec:
   hostname: www.ollama.com
   options:
     rateLimits:
-      - requestsPerUnit: 10
+      - tokensPerUnit: 10
         unit: minute
         model: llama3.2
