@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 
 	envoy_api_v3_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_service_proc_v3 "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
@@ -150,6 +151,8 @@ func (r *AIExtensionReconciler) Process(srv envoy_service_proc_v3.ExternalProces
 		case *envoy_service_proc_v3.ProcessingRequest_RequestBody:
 			fmt.Printf("Handle Request Body\n")
 
+			time.Sleep(5 * time.Second)
+
 			rbq := &envoy_service_proc_v3.BodyResponse{
 				Response: &envoy_service_proc_v3.CommonResponse{},
 			}
@@ -181,6 +184,16 @@ func (r *AIExtensionReconciler) Process(srv envoy_service_proc_v3.ExternalProces
 						Response: &envoy_service_proc_v3.ProcessingResponse_ImmediateResponse{
 							ImmediateResponse: &envoy_service_proc_v3.ImmediateResponse{
 								Status: &v32.HttpStatus{Code: v32.StatusCode_TooManyRequests},
+							},
+						},
+					}
+				} else {
+					// Return Immediate response anyway
+					resp = &envoy_service_proc_v3.ProcessingResponse{
+						Response: &envoy_service_proc_v3.ProcessingResponse_ImmediateResponse{
+							ImmediateResponse: &envoy_service_proc_v3.ImmediateResponse{
+								Status: &v32.HttpStatus{Code: v32.StatusCode_OK},
+								Body:   "Immediate Response",
 							},
 						},
 					}
