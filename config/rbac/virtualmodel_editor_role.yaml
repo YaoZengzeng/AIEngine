@@ -1,13 +1,15 @@
----
+# permissions for end users to edit virtualmodels.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: manager-role
+  labels:
+    app.kubernetes.io/name: aiengine
+    app.kubernetes.io/managed-by: kustomize
+  name: virtualmodel-editor-role
 rules:
 - apiGroups:
   - ai.kmesh.net
   resources:
-  - aiextensions
   - virtualmodels
   verbs:
   - create
@@ -20,16 +22,6 @@ rules:
 - apiGroups:
   - ai.kmesh.net
   resources:
-  - aiextensions/finalizers
-  - virtualmodels/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - ai.kmesh.net
-  resources:
-  - aiextensions/status
   - virtualmodels/status
   verbs:
   - get
-  - patch
-  - update

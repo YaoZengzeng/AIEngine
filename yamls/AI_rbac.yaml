@@ -9,6 +9,7 @@ rules:
       - ai.kmesh.net
     resources:
       - aiextensions
+      - virtualmodels
     verbs:
       - create
       - delete
@@ -21,6 +22,7 @@ rules:
       - ai.kmesh.net
     resources:
       - aiextensions/status
+      - virtualmodels/status
     verbs:
       - get
 ---
@@ -35,6 +37,7 @@ rules:
       - ai.kmesh.net
     resources:
       - aiextensions
+      - virtualmodels
     verbs:
       - get
       - list
@@ -43,6 +46,7 @@ rules:
       - ai.kmesh.net
     resources:
       - aiextensions/status
+      - virtualmodels/status
     verbs:
       - get
 ---

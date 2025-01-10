@@ -1,0 +1,89 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.4
+  name: virtualmodels.ai.kmesh.net
+spec:
+  group: ai.kmesh.net
+  names:
+    kind: VirtualModel
+    listKind: VirtualModelList
+    plural: virtualmodels
+    singular: virtualmodel
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: VirtualModel is the Schema for the virtualmodels API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: VirtualModelSpec defines the desired state of VirtualModel.
+            properties:
+              models:
+                items:
+                  type: string
+                type: array
+              rules:
+                items:
+                  properties:
+                    match:
+                      items:
+                        type: object
+                      type: array
+                    name:
+                      type: string
+                    route:
+                      items:
+                        properties:
+                          destination:
+                            properties:
+                              host:
+                                type: string
+                              model:
+                                type: string
+                            required:
+                            - host
+                            - model
+                            type: object
+                          weight:
+                            format: int32
+                            type: integer
+                        required:
+                        - destination
+                        type: object
+                      type: array
+                  required:
+                  - route
+                  type: object
+                type: array
+            required:
+            - rules
+            type: object
+          status:
+            description: VirtualModelStatus defines the observed state of VirtualModel.
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

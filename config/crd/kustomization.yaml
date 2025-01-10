@@ -3,6 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/ai.kmesh.net_aiextensions.yaml
+- bases/ai.kmesh.net_virtualmodels.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

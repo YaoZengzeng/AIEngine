@@ -45,6 +45,7 @@ import (
 	aiv1alpha1 "AIEngine/api/v1alpha1"
 	"AIEngine/internal/controller"
 	"AIEngine/internal/limiter/redis"
+	"AIEngine/internal/router"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -52,6 +53,19 @@ var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 )
+
+type ProcessorServer struct {
+	processors []envoy_service_proc_v3.ExternalProcessorServer
+}
+
+func (p *ProcessorServer) Process(srv envoy_service_proc_v3.ExternalProcessor_ProcessServer) error {
+
+	for _, proc := range p.processors {
+		proc.Process(srv)
+	}
+
+	return nil
+}
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
@@ -142,14 +156,32 @@ func main() {
 		os.Exit(1)
 	}
 
-	controller := &controller.AIExtensionReconciler{
+	ext := &controller.AIExtensionReconciler{
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
 		RateLimiter: limiter,
 	}
 
-	if err = controller.SetupWithManager(mgr); err != nil {
+	if err = ext.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AIExtension")
+		os.Exit(1)
+	}
+
+	router, err := router.NewModelRouter()
+	if err != nil {
+		setupLog.Error(err, "unable to constrcut model router")
+		os.Exit(1)
+	}
+
+	vm := &controller.VirtualModelReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+
+		ModelRouter: router,
+	}
+
+	if err = vm.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "VirtualModel")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
@@ -161,8 +193,13 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
+	p := &ProcessorServer{
+		// processors: []envoy_service_proc_v3.ExternalProcessorServer{ext, vm},
+		processors: []envoy_service_proc_v3.ExternalProcessorServer{vm},
+	}
+
 	gs := grpc.NewServer()
-	envoy_service_proc_v3.RegisterExternalProcessorServer(gs, controller)
+	envoy_service_proc_v3.RegisterExternalProcessorServer(gs, p)
 
 	go func() {
 		err = gs.Serve(lis)
