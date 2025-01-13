@@ -12,10 +12,10 @@ spec:
     route:
     - destination:
         host: ollama.ollama.svc.cluster.local
-        model: "llama:3.2"
+        model: "ollama/llama:3.2"
       weight: 70
     - destination:
         host: ollama.ollama-test.svc.cluster.local
-        model: "llama:3.2"
+        model: "ollama/llama:3.2"
       weight: 30
 
