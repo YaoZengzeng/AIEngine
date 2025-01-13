@@ -15,7 +15,7 @@ spec:
   - backendRefs:
     - name: aiengine
       port: 9002
-    messageTimeout: 10s
+    messageTimeout: 1000s
     processingMode:
       request:
         body: Streamed

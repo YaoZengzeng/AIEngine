@@ -152,7 +152,7 @@ func (r *VirtualModelReconciler) Process(srv envoy_service_proc_v3.ExternalProce
 
 				if resp, err := r.ModelRouter.Route(req.Model, req.Prompt); err != nil {
 					status = &v32.HttpStatus{Code: v32.StatusCode_BadRequest}
-					msg = "Failed to route model message"
+					msg = fmt.Sprintf("Failed to route model message: %v", err)
 				} else {
 					msg = resp
 				}

@@ -11,11 +11,11 @@ spec:
   # match: 
     route:
     - destination:
-        host: ollama.ollama.svc.cluster.local
-        model: "ollama/llama:3.2"
+        host: "http://ollama.ollama.svc.cluster.local:11434"
+        model: "ollama/llama3.2"
       weight: 70
     - destination:
-        host: ollama.ollama-test.svc.cluster.local
-        model: "ollama/llama:3.2"
+        host: "http://ollama.ollama-test.svc.cluster.local:11434"
+        model: "ollama/llama3.2"
       weight: 30
 
