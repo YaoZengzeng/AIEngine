@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -60,6 +62,9 @@ type Rule struct {
 	Name  string              `json:"name,omitempty"`
 	Match []*MatchCondition   `json:"match,omitempty"`
 	Route []*RouteDestination `json:"route"`
+
+	Timeout *time.Duration `json:"timeout,omitempty"`
+	Retries *Retry         `json:"retries,omitempty"`
 }
 
 type MatchCondition struct {
@@ -74,4 +79,8 @@ type RouteDestination struct {
 type Destination struct {
 	Host  string `json:"host"`
 	Model string `json:"model"`
+}
+
+type Retry struct {
+	Attempts int32 `json:"attempts"`
 }
