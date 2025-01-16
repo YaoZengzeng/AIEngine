@@ -18,4 +18,6 @@ spec:
         host: "http://ollama.ollama-test.svc.cluster.local:11434"
         model: "ollama/llama3.2"
       weight: 30
-
+    timeout: 10s
+    retries:
+      attempts: 3
