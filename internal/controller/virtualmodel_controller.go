@@ -27,6 +27,7 @@ import (
 	v32 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,6 +41,8 @@ import (
 type VirtualModelReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+
+	ResourceToModels map[string][]string
 
 	ModelRouter router.ModelRouter
 }
@@ -62,17 +65,34 @@ func (r *VirtualModelReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	var vm aiv1alpha1.VirtualModel
 	if err := r.Get(ctx, req.NamespacedName, &vm); err != nil {
-		log.Error(err, "unable to fetch VirtualModel")
+		if apierrors.IsNotFound(err) {
+			models := r.GetFromResourceMap(req.NamespacedName.String())
+			if err := r.ModelRouter.DeleteRoute(models); err != nil {
+				fmt.Printf("failed to delete route: %v", err)
+				return ctrl.Result{}, nil
+			}
+		}
+
+		fmt.Printf("unable to fetch VirtualModel: %v", err)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	log.V(1).Info("Get VirtualModel", "models", vm.Spec.Models)
-	if err := r.ModelRouter.UpdateRoute(&vm); err != nil {
+	if err := r.ModelRouter.UpdateRoute(vm.Spec.Models, vm.Spec.Rules); err != nil {
 		log.Error(err, "failed to update ModelRouter")
 		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *VirtualModelReconciler) GetFromResourceMap(namespacedName string) []string {
+
+	return nil
+}
+
+func (r *VirtualModelReconciler) SetForResourceMap(namespacedName string, models []string) {
+
 }
 
 func (r *VirtualModelReconciler) Process(srv envoy_service_proc_v3.ExternalProcessor_ProcessServer) error {

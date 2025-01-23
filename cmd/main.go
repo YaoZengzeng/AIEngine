@@ -177,6 +177,8 @@ func main() {
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 
+		ResourceToModels: make(map[string][]string),
+
 		ModelRouter: router,
 	}
 

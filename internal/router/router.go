@@ -10,8 +10,8 @@ import (
 type ModelRouter interface {
 	Route(model string, message string) (string, error)
 
-	UpdateRoute(vm *aiv1alpha1.VirtualModel) error
-	DeleteRoute(vm *aiv1alpha1.VirtualModel) error
+	UpdateRoute(models []string, rules []*aiv1alpha1.Rule) error
+	DeleteRoute(models []string) error
 }
 
 type modelRouterImpl struct {
@@ -59,17 +59,23 @@ func (m *modelRouterImpl) Route(model string, message string) (string, error) {
 	return m.proxy.Proxy(host, backendProvider, backendModel, message)
 }
 
-func (m *modelRouterImpl) UpdateRoute(vm *aiv1alpha1.VirtualModel) error {
-	fmt.Printf("UpdateRoute models: %v\n", vm.Spec.Models)
+func (m *modelRouterImpl) UpdateRoute(models []string, rules []*aiv1alpha1.Rule) error {
+	fmt.Printf("UpdateRoute models: %v\n", models)
 
-	for _, model := range vm.Spec.Models {
-		m.routes[model] = vm.Spec.Rules
+	for _, model := range models {
+		m.routes[model] = rules
 	}
 
 	return nil
 }
 
-func (m *modelRouterImpl) DeleteRoute(vm *aiv1alpha1.VirtualModel) error {
-	fmt.Printf("DeleteRoute models: %v\n", vm.Spec.Models)
+func (m *modelRouterImpl) DeleteRoute(models []string) error {
+	fmt.Printf("DeleteRoute models: %v\n", models)
+
+	for _, model := range models {
+		// TODO: consider a mode configured in multiple VirtualModel?
+		delete(m.routes, model)
+	}
+
 	return nil
 }
