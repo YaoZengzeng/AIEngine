@@ -78,6 +78,9 @@ func (r *VirtualModelReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	log.V(1).Info("Get VirtualModel", "models", vm.Spec.Models)
+
+	r.SetForResourceMap(req.NamespacedName.String(), vm.Spec.Models)
+
 	if err := r.ModelRouter.UpdateRoute(vm.Spec.Models, vm.Spec.Rules); err != nil {
 		log.Error(err, "failed to update ModelRouter")
 		return ctrl.Result{}, err
@@ -87,12 +90,11 @@ func (r *VirtualModelReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 func (r *VirtualModelReconciler) GetFromResourceMap(namespacedName string) []string {
-
-	return nil
+	return r.ResourceToModels[namespacedName]
 }
 
 func (r *VirtualModelReconciler) SetForResourceMap(namespacedName string, models []string) {
-
+	r.ResourceToModels[namespacedName] = models
 }
 
 func (r *VirtualModelReconciler) Process(srv envoy_service_proc_v3.ExternalProcessor_ProcessServer) error {
