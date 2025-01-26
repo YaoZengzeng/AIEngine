@@ -33,19 +33,22 @@ func (m *modelRouterImpl) Route(model string, message string) (string, error) {
 
 	rules, ok := m.routes[model]
 	if !ok {
-		return "", fmt.Errorf("Not found route rules for model %s", model)
+		return "", fmt.Errorf("not found route rules for model %s", model)
 	}
 
-	// For POC, directly use the first rule of the first route.
-	if len(rules) == 0 || len(rules[0].Route) == 0 {
-		return "", fmt.Errorf("Empty rules or route")
+	rule, err := m.selectRule(model, rules)
+	if err != nil {
+		return "", fmt.Errorf("failed to select route rule: %v", err)
 	}
 
-	host := rules[0].Route[0].Destination.Host
+	dst, err := m.selectDestination(rule.Route)
+	if err != nil {
+		return "", fmt.Errorf("failed to select destination: %v", err)
+	}
 
-	s := strings.Split(rules[0].Route[0].Destination.Model, "/")
+	s := strings.Split(dst.Destination.Model, "/")
 	if len(s) >= 3 {
-		return "", fmt.Errorf("The format of backend model should be \"model\" or \"provider/model\"")
+		return "", fmt.Errorf("the format of backend model should be \"model\" or \"provider/model\"")
 	}
 
 	var backendProvider, backendModel string
@@ -56,7 +59,20 @@ func (m *modelRouterImpl) Route(model string, message string) (string, error) {
 		backendModel = s[1]
 	}
 
-	return m.proxy.Proxy(host, backendProvider, backendModel, message)
+	return m.proxy.Proxy(dst.Destination.Host, backendProvider, backendModel, message)
+}
+
+func (m *modelRouterImpl) selectRule(model string, rules []*aiv1alpha1.Rule) (*aiv1alpha1.Rule, error) {
+	// For POC, directly use the first rule of the first route.
+	if len(rules) == 0 || len(rules[0].Route) == 0 {
+		return nil, fmt.Errorf("empty rules or route")
+	}
+
+	return rules[0], nil
+}
+
+func (m *modelRouterImpl) selectDestination(routes []*aiv1alpha1.RouteDestination) (*aiv1alpha1.RouteDestination, error) {
+	return routes[0], nil
 }
 
 func (m *modelRouterImpl) UpdateRoute(models []string, rules []*aiv1alpha1.Rule) error {
