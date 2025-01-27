@@ -71,7 +71,7 @@ type MatchCondition struct {
 
 type RouteDestination struct {
 	Destination *Destination `json:"destination"`
-	Weight      int32        `json:"weight,omitempty"`
+	Weight      *uint32      `json:"weight,omitempty"`
 }
 
 type Destination struct {

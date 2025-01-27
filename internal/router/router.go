@@ -1,10 +1,13 @@
 package router
 
 import (
+	"fmt"
+	"math/rand"
+	"strings"
+	"time"
+
 	aiv1alpha1 "AIEngine/api/v1alpha1"
 	"AIEngine/internal/proxy"
-	"fmt"
-	"strings"
 )
 
 type ModelRouter interface {
@@ -29,7 +32,7 @@ func NewModelRouter() (ModelRouter, error) {
 }
 
 func (m *modelRouterImpl) Route(model string, message string) (string, error) {
-	fmt.Printf("Route model %s, message %s\n", model, message)
+	// fmt.Printf("Route model %s, message %s\n", model, message)
 
 	rules, ok := m.routes[model]
 	if !ok {
@@ -59,6 +62,8 @@ func (m *modelRouterImpl) Route(model string, message string) (string, error) {
 		backendModel = s[1]
 	}
 
+	fmt.Printf("-- Route to backend host %s, backend provider %s, backend model %s\n", dst.Destination.Host, backendProvider, backendModel)
+
 	return m.proxy.Proxy(dst.Destination.Host, backendProvider, backendModel, message)
 }
 
@@ -72,7 +77,58 @@ func (m *modelRouterImpl) selectRule(model string, rules []*aiv1alpha1.Rule) (*a
 }
 
 func (m *modelRouterImpl) selectDestination(routes []*aiv1alpha1.RouteDestination) (*aiv1alpha1.RouteDestination, error) {
-	return routes[0], nil
+	weightedSlice, err := toWeightedSlice(routes)
+	if err != nil {
+		return nil, err
+	}
+
+	index := selectFromWeightedSlice(weightedSlice)
+
+	return routes[index], nil
+}
+
+func toWeightedSlice(routes []*aiv1alpha1.RouteDestination) ([]uint32, error) {
+	var isWeighted bool
+	if routes[0].Weight != nil {
+		isWeighted = true
+	}
+
+	res := make([]uint32, len(routes))
+
+	for i, route := range routes {
+		if (isWeighted && route.Weight == nil) || (!isWeighted && route.Weight != nil) {
+			return nil, fmt.Errorf("the weight field in routes must be either fully specified or not specified")
+		}
+
+		if isWeighted {
+			res[i] = *route.Weight
+		} else {
+			// If weight is not specified, set to 1.
+			res[i] = 1
+		}
+	}
+
+	return res, nil
+}
+
+func selectFromWeightedSlice(weights []uint32) int {
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	totalWeight := 0
+	for _, weight := range weights {
+		totalWeight += int(weight)
+	}
+
+	randomNum := rng.Intn(totalWeight)
+
+	for i, weight := range weights {
+		randomNum -= int(weight)
+		if randomNum < 0 {
+			return i
+		}
+	}
+
+	return 0
 }
 
 func (m *modelRouterImpl) UpdateRoute(models []string, rules []*aiv1alpha1.Rule) error {
