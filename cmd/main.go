@@ -54,19 +54,6 @@ var (
 	setupLog = ctrl.Log.WithName("setup")
 )
 
-type ProcessorServer struct {
-	processors []envoy_service_proc_v3.ExternalProcessorServer
-}
-
-func (p *ProcessorServer) Process(srv envoy_service_proc_v3.ExternalProcessor_ProcessServer) error {
-
-	for _, proc := range p.processors {
-		proc.Process(srv)
-	}
-
-	return nil
-}
-
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
@@ -156,16 +143,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	ext := &controller.AIExtensionReconciler{
-		Client:      mgr.GetClient(),
-		Scheme:      mgr.GetScheme(),
-		RateLimiter: limiter,
-	}
+	// Remove or replace AIExtension CRD in the future.
+	/*
+		ext := &controller.AIExtensionReconciler{
+			Client:      mgr.GetClient(),
+			Scheme:      mgr.GetScheme(),
+			RateLimiter: limiter,
+		}
 
-	if err = ext.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "AIExtension")
-		os.Exit(1)
-	}
+		if err = ext.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "AIExtension")
+			os.Exit(1)
+		}
+	*/
 
 	router, err := router.NewModelRouter()
 	if err != nil {
@@ -180,6 +170,7 @@ func main() {
 		ResourceToModels: make(map[string][]string),
 
 		ModelRouter: router,
+		RateLimiter: limiter,
 	}
 
 	if err = vm.SetupWithManager(mgr); err != nil {
@@ -195,13 +186,8 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	p := &ProcessorServer{
-		// processors: []envoy_service_proc_v3.ExternalProcessorServer{ext, vm},
-		processors: []envoy_service_proc_v3.ExternalProcessorServer{vm},
-	}
-
 	gs := grpc.NewServer()
-	envoy_service_proc_v3.RegisterExternalProcessorServer(gs, p)
+	envoy_service_proc_v3.RegisterExternalProcessorServer(gs, vm)
 
 	go func() {
 		err = gs.Serve(lis)

@@ -25,6 +25,8 @@ type VirtualModelSpec struct {
 	Models []string `json:"models,omitempty"`
 
 	Rules []*Rule `json:"rules"`
+
+	RateLimit *RateLimit `json:"rateLimit,omitempty"`
 }
 
 // VirtualModelStatus defines the observed state of VirtualModel.

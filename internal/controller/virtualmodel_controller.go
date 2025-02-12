@@ -25,6 +25,7 @@ import (
 	envoy_api_v3_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_service_proc_v3 "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	v32 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
+	"github.com/tmc/langchaingo/llms"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	aiv1alpha1 "AIEngine/api/v1alpha1"
+	"AIEngine/internal/limiter"
 	"AIEngine/internal/router"
 )
 
@@ -45,6 +47,8 @@ type VirtualModelReconciler struct {
 	ResourceToModels map[string][]string
 
 	ModelRouter router.ModelRouter
+
+	RateLimiter limiter.RateLimiter
 }
 
 // +kubebuilder:rbac:groups=ai.kmesh.net,resources=virtualmodels,verbs=get;list;watch;create;update;patch;delete
@@ -86,6 +90,15 @@ func (r *VirtualModelReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
+	if vm.Spec.RateLimit != nil {
+		for _, model := range vm.Spec.Models {
+			if err := r.RateLimiter.UpdateConfig(&limiter.RateLimitConfig{Model: model, TokensPerUnit: vm.Spec.RateLimit.TokensPerUnit, Unit: string(vm.Spec.RateLimit.Unit)}); err != nil {
+				log.Error(err, "failed to update config of RateLimiter")
+				return ctrl.Result{}, err
+			}
+		}
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -108,6 +121,7 @@ func (r *VirtualModelReconciler) Process(srv envoy_service_proc_v3.ExternalProce
 			return ctx.Err()
 		default:
 		}
+
 		req, err := srv.Recv()
 		if err == io.EOF {
 			fmt.Printf("--- Recv() get EOF, Exit VirtualModelReconciler Process")
@@ -165,6 +179,25 @@ func (r *VirtualModelReconciler) Process(srv envoy_service_proc_v3.ExternalProce
 				if err != nil {
 					fmt.Printf("Failed to unmarshal req")
 					break
+				}
+
+				tokenCount := llms.CountTokens("", req.Prompt)
+				fmt.Printf("Token Count is %d, DoLimit model: %s\n", tokenCount, req.Model)
+				if allowed := r.RateLimiter.DoLimit(host, req.Model, tokenCount); !allowed {
+					fmt.Printf("Trigger Rate Limit\n")
+					resp = &envoy_service_proc_v3.ProcessingResponse{
+						Response: &envoy_service_proc_v3.ProcessingResponse_ImmediateResponse{
+							ImmediateResponse: &envoy_service_proc_v3.ImmediateResponse{
+								Status: &v32.HttpStatus{Code: v32.StatusCode_TooManyRequests},
+							},
+						},
+					}
+
+					if err := srv.Send(resp); err != nil {
+						fmt.Printf("send error %v", err)
+					}
+
+					continue
 				}
 
 				fmt.Printf("VirtualModel host: %s, model: %s\n", host, req.Model)
@@ -246,6 +279,7 @@ func (r *VirtualModelReconciler) Process(srv envoy_service_proc_v3.ExternalProce
 		default:
 			fmt.Printf("Unknown Request type %v\n", v)
 		}
+
 		if err := srv.Send(resp); err != nil {
 			fmt.Printf("send error %v", err)
 		}

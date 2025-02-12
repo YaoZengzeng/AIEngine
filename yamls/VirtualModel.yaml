@@ -6,6 +6,9 @@ metadata:
 spec:
   models:
   - "llama"
+  rateLimit:
+    tokensPerUnit: 10
+    unit: minute
   rules:
   - name: "llama-route-32"
   # match: 
