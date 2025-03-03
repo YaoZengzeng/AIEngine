@@ -43,6 +43,25 @@ spec:
                 items:
                   type: string
                 type: array
+              rateLimit:
+                properties:
+                  model:
+                    type: string
+                  tokensPerUnit:
+                    format: int32
+                    type: integer
+                  unit:
+                    enum:
+                    - second
+                    - minute
+                    - hour
+                    - day
+                    - month
+                    type: string
+                required:
+                - tokensPerUnit
+                - unit
+                type: object
               rules:
                 items:
                   properties:

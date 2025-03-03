@@ -60,7 +60,6 @@ spec:
                           - month
                           type: string
                       required:
-                      - model
                       - tokensPerUnit
                       - unit
                       type: object

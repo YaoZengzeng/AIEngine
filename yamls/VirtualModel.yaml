@@ -5,7 +5,7 @@ metadata:
   namespace: ollama
 spec:
   models:
-  - "llama"
+  - "llama3.1"
   rateLimit:
     tokensPerUnit: 10
     unit: minute

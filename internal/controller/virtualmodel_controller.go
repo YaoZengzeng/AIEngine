@@ -202,23 +202,41 @@ func (r *VirtualModelReconciler) Process(srv envoy_service_proc_v3.ExternalProce
 
 				fmt.Printf("VirtualModel host: %s, model: %s\n", host, req.Model)
 
-				status := &v32.HttpStatus{Code: v32.StatusCode_OK}
-				var msg string
+				if _, err := r.ModelRouter.Route(req.Model, req.Prompt); err != nil {
+					resp = &envoy_service_proc_v3.ProcessingResponse{
+						Response: &envoy_service_proc_v3.ProcessingResponse_ImmediateResponse{
+							ImmediateResponse: &envoy_service_proc_v3.ImmediateResponse{
+								Status: &v32.HttpStatus{Code: v32.StatusCode_BadRequest},
+							},
+						},
+					}
 
-				if resp, err := r.ModelRouter.Route(req.Model, req.Prompt); err != nil {
-					status = &v32.HttpStatus{Code: v32.StatusCode_BadRequest}
-					msg = fmt.Sprintf("Failed to route model message: %v", err)
-				} else {
-					msg = resp
+					if err := srv.Send(resp); err != nil {
+						fmt.Printf("send error %v", err)
+					}
+
+					continue
+				}
+
+				rhq := &envoy_service_proc_v3.BodyResponse{
+					Response: &envoy_service_proc_v3.CommonResponse{
+						HeaderMutation: &envoy_service_proc_v3.HeaderMutation{
+							SetHeaders: []*envoy_api_v3_core.HeaderValueOption{
+								{
+									Header: &envoy_api_v3_core.HeaderValue{
+										Key:      "kmesh-selected-ip",
+										RawValue: []byte("10.244.0.17"),
+									},
+								},
+							},
+						},
+					},
 				}
 
 				// Return Immediate response anyway
 				resp = &envoy_service_proc_v3.ProcessingResponse{
-					Response: &envoy_service_proc_v3.ProcessingResponse_ImmediateResponse{
-						ImmediateResponse: &envoy_service_proc_v3.ImmediateResponse{
-							Status: status,
-							Body:   msg,
-						},
+					Response: &envoy_service_proc_v3.ProcessingResponse_ResponseBody{
+						ResponseBody: rhq,
 					},
 				}
 			}
