@@ -225,7 +225,7 @@ func (r *VirtualModelReconciler) Process(srv envoy_service_proc_v3.ExternalProce
 								{
 									Header: &envoy_api_v3_core.HeaderValue{
 										Key:      "kmesh-selected-ip",
-										RawValue: []byte("10.244.0.17"),
+										RawValue: []byte("10.244.0.8"),
 									},
 								},
 							},
