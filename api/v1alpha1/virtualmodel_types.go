@@ -77,8 +77,9 @@ type RouteDestination struct {
 }
 
 type Destination struct {
-	Host  string `json:"host"`
-	Model string `json:"model"`
+	TargetModel string `json:"targetModel"`
+	Subset      string `json:"subset,omitempty"`
+	Lora        string `json:"lora,omitempty"`
 }
 
 type Retry struct {

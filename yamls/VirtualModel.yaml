@@ -15,11 +15,13 @@ spec:
     route:
     - destination:
         targetModel: "deepseek-r1:1.5b"
-        #lora: deepseek-r1-lora1
+        #lora: lora1
         #subset: v1
       weight: 70
     - destination:
         targetModel: "deepseek-r1:7b"
+        #lora: lora2
+        #subset: v2
       weight: 30
     timeout: 10s
     retries:

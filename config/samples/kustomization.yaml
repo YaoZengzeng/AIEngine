@@ -2,4 +2,5 @@
 resources:
 - ai_v1alpha1_aiextension.yaml
 - ai_v1alpha1_virtualmodel.yaml
+- ai_v1alpha1_targetmodel.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

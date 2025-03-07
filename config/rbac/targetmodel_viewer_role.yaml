@@ -1,0 +1,23 @@
+# permissions for end users to view targetmodels.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: aiengine
+    app.kubernetes.io/managed-by: kustomize
+  name: targetmodel-viewer-role
+rules:
+- apiGroups:
+  - ai.kmesh.net
+  resources:
+  - targetmodels
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ai.kmesh.net
+  resources:
+  - targetmodels/status
+  verbs:
+  - get
