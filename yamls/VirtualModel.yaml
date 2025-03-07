@@ -5,7 +5,7 @@ metadata:
   namespace: ollama
 spec:
   models:
-  - "deepseek-r1:1.5b"
+  - "deepseek-r1"
   rateLimit:
     tokensPerUnit: 10
     unit: minute
@@ -14,12 +14,12 @@ spec:
   # match: 
     route:
     - destination:
-        host: "http://ollama.ollama.svc.cluster.local:11434"
-        model: "ollama/deepseek-r1:1.5b"
+        targetModel: "deepseek-r1:1.5b"
+        #lora: deepseek-r1-lora1
+        #subset: v1
       weight: 70
     - destination:
-        host: "http://ollama.ollama-test.svc.cluster.local:11434"
-        model: "ollama/deepseek-r1:7b"
+        targetModel: "deepseek-r1:7b"
       weight: 30
     timeout: 10s
     retries:
