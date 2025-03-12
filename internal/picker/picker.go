@@ -20,5 +20,5 @@ func NewEndpointPicker() (EndpointPicker, error) {
 }
 
 func (e *endpointPickerImpl) PickEndpoint(*aiv1alpha1.Destination) (*Endpoint, error) {
-	return &Endpoint{Address: "10.244.0.8"}, nil
+	return &Endpoint{Address: "10.244.0.7"}, nil
 }

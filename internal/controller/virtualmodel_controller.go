@@ -207,6 +207,7 @@ func (r *VirtualModelReconciler) Process(srv envoy_service_proc_v3.ExternalProce
 
 				targetModel, err := r.ModelRouter.Route(req.Model)
 				if err != nil {
+					fmt.Printf("failed to route model: %v", err)
 					resp = &envoy_service_proc_v3.ProcessingResponse{
 						Response: &envoy_service_proc_v3.ProcessingResponse_ImmediateResponse{
 							ImmediateResponse: &envoy_service_proc_v3.ImmediateResponse{
@@ -224,6 +225,7 @@ func (r *VirtualModelReconciler) Process(srv envoy_service_proc_v3.ExternalProce
 
 				endpoint, err := r.EndpointPicker.PickEndpoint(targetModel)
 				if err != nil {
+					fmt.Printf("failed to pick endpoint: %v", err)
 					resp = &envoy_service_proc_v3.ProcessingResponse{
 						Response: &envoy_service_proc_v3.ProcessingResponse_ImmediateResponse{
 							ImmediateResponse: &envoy_service_proc_v3.ImmediateResponse{

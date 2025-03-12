@@ -84,13 +84,14 @@ spec:
                         properties:
                           destination:
                             properties:
-                              host:
+                              lora:
                                 type: string
-                              model:
+                              subset:
+                                type: string
+                              targetModel:
                                 type: string
                             required:
-                            - host
-                            - model
+                            - targetModel
                             type: object
                           weight:
                             format: int32
