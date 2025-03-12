@@ -45,6 +45,7 @@ import (
 	aiv1alpha1 "AIEngine/api/v1alpha1"
 	"AIEngine/internal/controller"
 	"AIEngine/internal/limiter/redis"
+	"AIEngine/internal/picker"
 	"AIEngine/internal/router"
 	// +kubebuilder:scaffold:imports
 )
@@ -157,6 +158,12 @@ func main() {
 		}
 	*/
 
+	picker, err := picker.NewEndpointPicker()
+	if err != nil {
+		setupLog.Error(err, "unable to construct endpoint picker")
+		os.Exit(1)
+	}
+
 	router, err := router.NewModelRouter()
 	if err != nil {
 		setupLog.Error(err, "unable to constrcut model router")
@@ -169,8 +176,9 @@ func main() {
 
 		ResourceToModels: make(map[string][]string),
 
-		ModelRouter: router,
-		RateLimiter: limiter,
+		ModelRouter:    router,
+		EndpointPicker: picker,
+		RateLimiter:    limiter,
 	}
 
 	if err = vm.SetupWithManager(mgr); err != nil {

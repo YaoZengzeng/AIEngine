@@ -36,6 +36,7 @@ import (
 
 	aiv1alpha1 "AIEngine/api/v1alpha1"
 	"AIEngine/internal/limiter"
+	"AIEngine/internal/picker"
 	"AIEngine/internal/router"
 )
 
@@ -47,6 +48,8 @@ type VirtualModelReconciler struct {
 	ResourceToModels map[string][]string
 
 	ModelRouter router.ModelRouter
+
+	EndpointPicker picker.EndpointPicker
 
 	RateLimiter limiter.RateLimiter
 }
@@ -202,7 +205,25 @@ func (r *VirtualModelReconciler) Process(srv envoy_service_proc_v3.ExternalProce
 
 				fmt.Printf("VirtualModel host: %s, model: %s\n", host, req.Model)
 
-				if _, err := r.ModelRouter.Route(req.Model, req.Prompt); err != nil {
+				targetModel, err := r.ModelRouter.Route(req.Model)
+				if err != nil {
+					resp = &envoy_service_proc_v3.ProcessingResponse{
+						Response: &envoy_service_proc_v3.ProcessingResponse_ImmediateResponse{
+							ImmediateResponse: &envoy_service_proc_v3.ImmediateResponse{
+								Status: &v32.HttpStatus{Code: v32.StatusCode_BadRequest},
+							},
+						},
+					}
+
+					if err := srv.Send(resp); err != nil {
+						fmt.Printf("send error %v", err)
+					}
+
+					continue
+				}
+
+				endpoint, err := r.EndpointPicker.PickEndpoint(targetModel)
+				if err != nil {
 					resp = &envoy_service_proc_v3.ProcessingResponse{
 						Response: &envoy_service_proc_v3.ProcessingResponse_ImmediateResponse{
 							ImmediateResponse: &envoy_service_proc_v3.ImmediateResponse{
@@ -225,7 +246,7 @@ func (r *VirtualModelReconciler) Process(srv envoy_service_proc_v3.ExternalProce
 								{
 									Header: &envoy_api_v3_core.HeaderValue{
 										Key:      "kmesh-selected-ip",
-										RawValue: []byte("10.244.0.8"),
+										RawValue: []byte(endpoint.Address),
 									},
 								},
 							},
@@ -233,7 +254,6 @@ func (r *VirtualModelReconciler) Process(srv envoy_service_proc_v3.ExternalProce
 					},
 				}
 
-				// Return Immediate response anyway
 				resp = &envoy_service_proc_v3.ProcessingResponse{
 					Response: &envoy_service_proc_v3.ProcessingResponse_ResponseBody{
 						ResponseBody: rhq,

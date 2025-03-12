@@ -3,7 +3,6 @@ package router
 import (
 	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 
 	aiv1alpha1 "AIEngine/api/v1alpha1"
@@ -11,7 +10,7 @@ import (
 )
 
 type ModelRouter interface {
-	Route(model string, message string) (string, error)
+	Route(model string) (*aiv1alpha1.Destination, error)
 
 	UpdateRoute(models []string, rules []*aiv1alpha1.Rule) error
 	DeleteRoute(models []string) error
@@ -31,40 +30,23 @@ func NewModelRouter() (ModelRouter, error) {
 	return &modelRouterImpl{routes: make(map[string][]*aiv1alpha1.Rule), proxy: proxy}, nil
 }
 
-func (m *modelRouterImpl) Route(model string, message string) (string, error) {
-	// fmt.Printf("Route model %s, message %s\n", model, message)
-
+func (m *modelRouterImpl) Route(model string) (*aiv1alpha1.Destination, error) {
 	rules, ok := m.routes[model]
 	if !ok {
-		return "", fmt.Errorf("not found route rules for model %s", model)
+		return nil, fmt.Errorf("not found route rules for model %s", model)
 	}
 
 	rule, err := m.selectRule(model, rules)
 	if err != nil {
-		return "", fmt.Errorf("failed to select route rule: %v", err)
+		return nil, fmt.Errorf("failed to select route rule: %v", err)
 	}
 
 	dst, err := m.selectDestination(rule.Route)
 	if err != nil {
-		return "", fmt.Errorf("failed to select destination: %v", err)
+		return nil, fmt.Errorf("failed to select destination: %v", err)
 	}
 
-	s := strings.Split(dst.Destination.Model, "/")
-	if len(s) >= 3 {
-		return "", fmt.Errorf("the format of backend model should be \"model\" or \"provider/model\"")
-	}
-
-	var backendProvider, backendModel string
-	if len(s) == 1 {
-		backendModel = s[0]
-	} else {
-		backendProvider = s[0]
-		backendModel = s[1]
-	}
-
-	fmt.Printf("-- Route to backend host %s, backend provider %s, backend model %s\n", dst.Destination.Host, backendProvider, backendModel)
-
-	return m.proxy.Proxy(dst.Destination.Host, backendProvider, backendModel, message)
+	return dst.Destination, nil
 }
 
 func (m *modelRouterImpl) selectRule(model string, rules []*aiv1alpha1.Rule) (*aiv1alpha1.Rule, error) {
