@@ -23,6 +23,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	aiv1alpha1 "AIEngine/api/v1alpha1"
 )
 
 // TargetModelReconciler reconciles a TargetModel object
@@ -55,8 +57,7 @@ func (r *TargetModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 // SetupWithManager sets up the controller with the Manager.
 func (r *TargetModelReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		// Uncomment the following line adding a pointer to an instance of the controlled resource as an argument
-		// For().
+		For(&aiv1alpha1.TargetModel{}).
 		Named("targetmodel").
 		Complete(r)
 }

@@ -10,6 +10,7 @@ rules:
     resources:
       - aiextensions
       - virtualmodels
+      - targetmodels
     verbs:
       - create
       - delete
@@ -23,6 +24,7 @@ rules:
     resources:
       - aiextensions/status
       - virtualmodels/status
+      - targetmodels/status
     verbs:
       - get
 ---
@@ -38,6 +40,7 @@ rules:
     resources:
       - aiextensions
       - virtualmodels
+      - targetmodels
     verbs:
       - get
       - list
@@ -47,6 +50,7 @@ rules:
     resources:
       - aiextensions/status
       - virtualmodels/status
+      - targetmodels/status
     verbs:
       - get
 ---

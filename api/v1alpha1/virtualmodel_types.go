@@ -85,3 +85,20 @@ type Destination struct {
 type Retry struct {
 	Attempts int32 `json:"attempts"`
 }
+
+// +kubebuilder:validation:Enum=second;minute;hour;day;month
+type RateLimitUnit string
+
+const (
+	Second RateLimitUnit = "second"
+	Minute RateLimitUnit = "minute"
+	Hour   RateLimitUnit = "hour"
+	Day    RateLimitUnit = "day"
+	Month  RateLimitUnit = "month"
+)
+
+type RateLimit struct {
+	TokensPerUnit uint32        `json:"tokensPerUnit"`
+	Unit          RateLimitUnit `json:"unit"`
+	Model         string        `json:"model,omitempty"`
+}

@@ -7,7 +7,7 @@ rules:
 - apiGroups:
   - ai.kmesh.net
   resources:
-  - aiextensions
+  - targetmodels
   - virtualmodels
   verbs:
   - create
@@ -20,14 +20,14 @@ rules:
 - apiGroups:
   - ai.kmesh.net
   resources:
-  - aiextensions/finalizers
+  - targetmodels/finalizers
   - virtualmodels/finalizers
   verbs:
   - update
 - apiGroups:
   - ai.kmesh.net
   resources:
-  - aiextensions/status
+  - targetmodels/status
   - virtualmodels/status
   verbs:
   - get

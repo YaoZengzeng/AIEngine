@@ -54,6 +54,12 @@ type VirtualModelReconciler struct {
 	RateLimiter limiter.RateLimiter
 }
 
+type Request struct {
+	Model string `json:"model"`
+
+	Prompt string `json:"prompt"`
+}
+
 // +kubebuilder:rbac:groups=ai.kmesh.net,resources=virtualmodels,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=ai.kmesh.net,resources=virtualmodels/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=ai.kmesh.net,resources=virtualmodels/finalizers,verbs=update

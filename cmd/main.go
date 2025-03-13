@@ -138,34 +138,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	tm := &controller.TargetModelReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}
-	if err := tm.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "TargetModel")
-		os.Exit(1)
-	}
-
 	limiter, err := redis.NewRateLimiter()
 	if err != nil {
 		setupLog.Error(err, "unable to construct rate limiter")
 		os.Exit(1)
 	}
-
-	// Remove or replace AIExtension CRD in the future.
-	/*
-		ext := &controller.AIExtensionReconciler{
-			Client:      mgr.GetClient(),
-			Scheme:      mgr.GetScheme(),
-			RateLimiter: limiter,
-		}
-
-		if err = ext.SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "AIExtension")
-			os.Exit(1)
-		}
-	*/
 
 	picker, err := picker.NewEndpointPicker()
 	if err != nil {
