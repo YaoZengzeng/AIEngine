@@ -138,6 +138,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	tm := &controller.TargetModelReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}
+	if err := tm.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "TargetModel")
+		os.Exit(1)
+	}
+
 	limiter, err := redis.NewRateLimiter()
 	if err != nil {
 		setupLog.Error(err, "unable to construct rate limiter")
@@ -183,6 +192,13 @@ func main() {
 
 	if err = vm.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "VirtualModel")
+		os.Exit(1)
+	}
+	if err = (&controller.TargetModelReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "TargetModel")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
