@@ -27,6 +27,18 @@ rules:
       - targetmodels/status
     verbs:
       - get
+  - apiGroups:
+      - ""
+    resources:
+      - "pods"
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
 ---
 # permissions for end users to view aiextensions.
 apiVersion: rbac.authorization.k8s.io/v1
