@@ -22,17 +22,22 @@ import (
 
 // ModelRouteSpec defines the desired state of ModelRoute.
 type ModelRouteSpec struct {
+	// The model name in the LLM request.
 	ModelName string `json:"modelName"`
 
+	// An ordered list of route rules for LLM traffic. The first rule
+	// matching an incoming request will be used.
 	Rules []*Rule `json:"rules"`
 
+	// Rate limit for `ModelName`
 	RateLimit *RateLimit `json:"rateLimit,omitempty"`
 
 	// Auth *Auth `json:"auth,omitempty"`
 }
 
 type Rule struct {
-	Name         string         `json:"name,omitempty"`
+	Name string `json:"name,omitempty"`
+	// If no `modelMatches` is specified, it will be default route.
 	ModelMatches []*ModelMatch  `json:"modelMatches,omitempty"`
 	TargetModels []*TargetModel `json:"targetModels"`
 }
