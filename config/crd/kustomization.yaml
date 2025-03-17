@@ -5,6 +5,8 @@ resources:
 - bases/ai.kmesh.net_aiextensions.yaml
 - bases/ai.kmesh.net_virtualmodels.yaml
 - bases/ai.kmesh.net_targetmodels.yaml
+- bases/ai.kmesh.net_modelroutes.yaml
+- bases/ai.kmesh.net_modelservers.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

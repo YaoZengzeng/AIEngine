@@ -1,0 +1,27 @@
+# permissions for end users to edit modelservers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: aiengine
+    app.kubernetes.io/managed-by: kustomize
+  name: modelserver-editor-role
+rules:
+- apiGroups:
+  - ai.kmesh.net
+  resources:
+  - modelservers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ai.kmesh.net
+  resources:
+  - modelservers/status
+  verbs:
+  - get

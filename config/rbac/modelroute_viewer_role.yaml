@@ -1,0 +1,23 @@
+# permissions for end users to view modelroutes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: aiengine
+    app.kubernetes.io/managed-by: kustomize
+  name: modelroute-viewer-role
+rules:
+- apiGroups:
+  - ai.kmesh.net
+  resources:
+  - modelroutes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ai.kmesh.net
+  resources:
+  - modelroutes/status
+  verbs:
+  - get

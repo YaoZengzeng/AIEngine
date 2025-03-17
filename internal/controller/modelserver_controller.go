@@ -37,16 +37,16 @@ import (
 	aiv1alpha1 "AIEngine/api/v1alpha1"
 )
 
-// TargetModelReconciler reconciles a TargetModel object
-type TargetModelReconciler struct {
+// ModelServerReconciler reconciles a ModelServer object
+type ModelServerReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
 	PodMapping sync.Map
 }
 
-func (r *TargetModelReconciler) UpdatePodMapping(key types.NamespacedName, pods []corev1.Pod) {
-	fmt.Printf("TargetModel is %v, pods: \n", key)
+func (r *ModelServerReconciler) UpdatePodMapping(key types.NamespacedName, pods []corev1.Pod) {
+	fmt.Printf("ModelServer is %v, pods: \n", key)
 	for _, pod := range pods {
 		fmt.Printf("%v\n", pod.Name)
 	}
@@ -54,7 +54,7 @@ func (r *TargetModelReconciler) UpdatePodMapping(key types.NamespacedName, pods 
 	r.PodMapping.Store(key, pods)
 }
 
-func (r *TargetModelReconciler) GetPodsFromModel(key types.NamespacedName) []corev1.Pod {
+func (r *ModelServerReconciler) GetPodsFromModel(key types.NamespacedName) []corev1.Pod {
 	if val, ok := r.PodMapping.Load(key); ok {
 		return val.([]corev1.Pod)
 	}
@@ -62,29 +62,29 @@ func (r *TargetModelReconciler) GetPodsFromModel(key types.NamespacedName) []cor
 	return nil
 }
 
-// +kubebuilder:rbac:groups=ai.kmesh.net,resources=targetmodels,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=ai.kmesh.net,resources=targetmodels/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=ai.kmesh.net,resources=targetmodels/finalizers,verbs=update
+// +kubebuilder:rbac:groups=ai.kmesh.net,resources=ModelServers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=ai.kmesh.net,resources=ModelServers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=ai.kmesh.net,resources=ModelServers/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the TargetModel object against the actual cluster state, and then
+// the ModelServer object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.1/pkg/reconcile
-func (r *TargetModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ModelServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
-	targetModel := &aiv1alpha1.TargetModel{}
-	if err := r.Get(ctx, req.NamespacedName, targetModel); err != nil {
+	ModelServer := &aiv1alpha1.ModelServer{}
+	if err := r.Get(ctx, req.NamespacedName, ModelServer); err != nil {
 		r.PodMapping.Delete(req.NamespacedName)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: targetModel.Spec.WorkloadSelector.MatchLabels})
+	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: ModelServer.Spec.WorkloadSelector.MatchLabels})
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("invalid selector: %v", err)
 	}
@@ -100,23 +100,23 @@ func (r *TargetModelReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *TargetModelReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ModelServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&aiv1alpha1.TargetModel{}).
+		For(&aiv1alpha1.ModelServer{}).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(handler.MapFunc(r.podEventHandler)), builder.WithPredicates(predicate.LabelChangedPredicate{})).
-		Named("targetmodel").
+		Named("ModelServer").
 		Complete(r)
 }
 
-func (r *TargetModelReconciler) podEventHandler(ctx context.Context, obj client.Object) []reconcile.Request {
+func (r *ModelServerReconciler) podEventHandler(ctx context.Context, obj client.Object) []reconcile.Request {
 	pod := obj.(*corev1.Pod)
-	targetModels := &aiv1alpha1.TargetModelList{}
-	if err := r.List(ctx, targetModels, client.InNamespace(pod.Namespace)); err != nil {
+	ModelServers := &aiv1alpha1.ModelServerList{}
+	if err := r.List(ctx, ModelServers, client.InNamespace(pod.Namespace)); err != nil {
 		return nil
 	}
 
 	var requests []reconcile.Request
-	for _, tm := range targetModels.Items {
+	for _, tm := range ModelServers.Items {
 		selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: tm.Spec.WorkloadSelector.MatchLabels})
 		if err != nil || !selector.Matches(labels.Set(pod.Labels)) {
 			continue

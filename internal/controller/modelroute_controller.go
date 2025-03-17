@@ -40,12 +40,12 @@ import (
 	"AIEngine/internal/router"
 )
 
-// VirtualModelReconciler reconciles a VirtualModel object
-type VirtualModelReconciler struct {
+// ModelRouteReconciler reconciles a ModelRoute object
+type ModelRouteReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	ResourceToModels map[string][]string
+	ResourceToModels map[string]string
 
 	ModelRouter router.ModelRouter
 
@@ -60,67 +60,65 @@ type Request struct {
 	Prompt string `json:"prompt"`
 }
 
-// +kubebuilder:rbac:groups=ai.kmesh.net,resources=virtualmodels,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=ai.kmesh.net,resources=virtualmodels/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=ai.kmesh.net,resources=virtualmodels/finalizers,verbs=update
+// +kubebuilder:rbac:groups=ai.kmesh.net,resources=ModelRoutes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=ai.kmesh.net,resources=ModelRoutes/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=ai.kmesh.net,resources=ModelRoutes/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the VirtualModel object against the actual cluster state, and then
+// the ModelRoute object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.1/pkg/reconcile
-func (r *VirtualModelReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ModelRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	var vm aiv1alpha1.VirtualModel
-	if err := r.Get(ctx, req.NamespacedName, &vm); err != nil {
+	var mr aiv1alpha1.ModelRoute
+	if err := r.Get(ctx, req.NamespacedName, &mr); err != nil {
 		if apierrors.IsNotFound(err) {
-			models := r.GetFromResourceMap(req.NamespacedName.String())
-			if err := r.ModelRouter.DeleteRoute(models); err != nil {
+			model := r.GetFromResourceMap(req.NamespacedName.String())
+			if err := r.ModelRouter.DeleteRoute(model); err != nil {
 				fmt.Printf("failed to delete route: %v", err)
 				return ctrl.Result{}, nil
 			}
 		}
 
-		fmt.Printf("unable to fetch VirtualModel: %v", err)
+		fmt.Printf("unable to fetch ModelRoute: %v", err)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	log.V(1).Info("Get VirtualModel", "models", vm.Spec.Models)
+	log.V(1).Info("Get ModelRoute", "model", mr.Spec.ModelName)
 
-	r.SetForResourceMap(req.NamespacedName.String(), vm.Spec.Models)
+	r.SetForResourceMap(req.NamespacedName.String(), mr.Spec.ModelName)
 
-	if err := r.ModelRouter.UpdateRoute(vm.Spec.Models, vm.Spec.Rules); err != nil {
+	if err := r.ModelRouter.UpdateRoute(mr.Spec.ModelName, mr.Spec.Rules); err != nil {
 		log.Error(err, "failed to update ModelRouter")
 		return ctrl.Result{}, err
 	}
 
-	if vm.Spec.RateLimit != nil {
-		for _, model := range vm.Spec.Models {
-			if err := r.RateLimiter.UpdateConfig(&limiter.RateLimitConfig{Model: model, TokensPerUnit: vm.Spec.RateLimit.TokensPerUnit, Unit: string(vm.Spec.RateLimit.Unit)}); err != nil {
-				log.Error(err, "failed to update config of RateLimiter")
-				return ctrl.Result{}, err
-			}
+	if mr.Spec.RateLimit != nil {
+		if err := r.RateLimiter.UpdateConfig(&limiter.RateLimitConfig{Model: mr.Spec.ModelName, TokensPerUnit: mr.Spec.RateLimit.TokensPerUnit, Unit: string(mr.Spec.RateLimit.Unit)}); err != nil {
+			log.Error(err, "failed to update config of RateLimiter")
+			return ctrl.Result{}, err
 		}
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *VirtualModelReconciler) GetFromResourceMap(namespacedName string) []string {
+func (r *ModelRouteReconciler) GetFromResourceMap(namespacedName string) string {
 	return r.ResourceToModels[namespacedName]
 }
 
-func (r *VirtualModelReconciler) SetForResourceMap(namespacedName string, models []string) {
-	r.ResourceToModels[namespacedName] = models
+func (r *ModelRouteReconciler) SetForResourceMap(namespacedName string, model string) {
+	r.ResourceToModels[namespacedName] = model
 }
 
-func (r *VirtualModelReconciler) Process(srv envoy_service_proc_v3.ExternalProcessor_ProcessServer) error {
-	fmt.Printf("--- Calling VirtualModelReconciler Process\n")
+func (r *ModelRouteReconciler) Process(srv envoy_service_proc_v3.ExternalProcessor_ProcessServer) error {
+	fmt.Printf("--- Calling ModelRouteReconciler Process\n")
 
 	host := ""
 	ctx := srv.Context()
@@ -133,7 +131,7 @@ func (r *VirtualModelReconciler) Process(srv envoy_service_proc_v3.ExternalProce
 
 		req, err := srv.Recv()
 		if err == io.EOF {
-			fmt.Printf("--- Recv() get EOF, Exit VirtualModelReconciler Process")
+			fmt.Printf("--- Recv() get EOF, Exit ModelRouteReconciler Process")
 			return nil
 		}
 		if err != nil {
@@ -209,7 +207,7 @@ func (r *VirtualModelReconciler) Process(srv envoy_service_proc_v3.ExternalProce
 					continue
 				}
 
-				fmt.Printf("VirtualModel host: %s, model: %s\n", host, req.Model)
+				fmt.Printf("ModelRoute host: %s, model: %s\n", host, req.Model)
 
 				targetModel, err := r.ModelRouter.Route(req.Model)
 				if err != nil {
@@ -333,9 +331,9 @@ func (r *VirtualModelReconciler) Process(srv envoy_service_proc_v3.ExternalProce
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *VirtualModelReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ModelRouteReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&aiv1alpha1.VirtualModel{}).
-		Named("virtualmodel").
+		For(&aiv1alpha1.ModelRoute{}).
+		Named("ModelRoute").
 		Complete(r)
 }

@@ -156,11 +156,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	vm := &controller.VirtualModelReconciler{
+	vm := &controller.ModelRouteReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 
-		ResourceToModels: make(map[string][]string),
+		ResourceToModels: make(map[string]string),
 
 		ModelRouter:    router,
 		EndpointPicker: picker,
@@ -171,7 +171,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "VirtualModel")
 		os.Exit(1)
 	}
-	if err = (&controller.TargetModelReconciler{
+	if err = (&controller.ModelServerReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {

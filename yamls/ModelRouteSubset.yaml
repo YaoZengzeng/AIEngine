@@ -1,0 +1,16 @@
+apiVersion: ai.kmesh.net/v1alpha1
+kind: ModelRoute
+metadata:
+  name: deepseek
+  namespace: ollama
+spec:
+  modelName: "deepseek-r1"
+  ruels:
+  - name: "deepseek-r1-route"
+    targetModels:
+    - name: "deepseek-r1:1.5b"
+      subset: v1
+      weight: 70
+    - name: "deepseek-r1:1.5b"
+      subset: v2
+      weight: 30

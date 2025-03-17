@@ -5,7 +5,7 @@ import (
 )
 
 type EndpointPicker interface {
-	PickEndpoint(*aiv1alpha1.Destination) (*Endpoint, error)
+	PickEndpoint(*aiv1alpha1.TargetModel) (*Endpoint, error)
 }
 
 type Endpoint struct {
@@ -19,6 +19,6 @@ func NewEndpointPicker() (EndpointPicker, error) {
 	return &endpointPickerImpl{}, nil
 }
 
-func (e *endpointPickerImpl) PickEndpoint(*aiv1alpha1.Destination) (*Endpoint, error) {
+func (e *endpointPickerImpl) PickEndpoint(*aiv1alpha1.TargetModel) (*Endpoint, error) {
 	return &Endpoint{Address: "10.244.0.7"}, nil
 }

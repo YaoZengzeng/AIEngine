@@ -10,10 +10,10 @@ import (
 )
 
 type ModelRouter interface {
-	Route(model string) (*aiv1alpha1.Destination, error)
+	Route(model string) (*aiv1alpha1.TargetModel, error)
 
-	UpdateRoute(models []string, rules []*aiv1alpha1.Rule) error
-	DeleteRoute(models []string) error
+	UpdateRoute(model string, rules []*aiv1alpha1.Rule) error
+	DeleteRoute(model string) error
 }
 
 type modelRouterImpl struct {
@@ -30,7 +30,7 @@ func NewModelRouter() (ModelRouter, error) {
 	return &modelRouterImpl{routes: make(map[string][]*aiv1alpha1.Rule), proxy: proxy}, nil
 }
 
-func (m *modelRouterImpl) Route(model string) (*aiv1alpha1.Destination, error) {
+func (m *modelRouterImpl) Route(model string) (*aiv1alpha1.TargetModel, error) {
 	rules, ok := m.routes[model]
 	if !ok {
 		return nil, fmt.Errorf("not found route rules for model %s", model)
@@ -41,49 +41,49 @@ func (m *modelRouterImpl) Route(model string) (*aiv1alpha1.Destination, error) {
 		return nil, fmt.Errorf("failed to select route rule: %v", err)
 	}
 
-	dst, err := m.selectDestination(rule.Route)
+	dst, err := m.selectDestination(rule.TargetModels)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select destination: %v", err)
 	}
 
-	return dst.Destination, nil
+	return dst, nil
 }
 
 func (m *modelRouterImpl) selectRule(model string, rules []*aiv1alpha1.Rule) (*aiv1alpha1.Rule, error) {
-	// For POC, directly use the first rule of the first route.
-	if len(rules) == 0 || len(rules[0].Route) == 0 {
-		return nil, fmt.Errorf("empty rules or route")
+	// For POC, directly use the first rule.
+	if len(rules) == 0 || len(rules[0].TargetModels) == 0 {
+		return nil, fmt.Errorf("empty rules or target models")
 	}
 
 	return rules[0], nil
 }
 
-func (m *modelRouterImpl) selectDestination(routes []*aiv1alpha1.RouteDestination) (*aiv1alpha1.RouteDestination, error) {
-	weightedSlice, err := toWeightedSlice(routes)
+func (m *modelRouterImpl) selectDestination(targets []*aiv1alpha1.TargetModel) (*aiv1alpha1.TargetModel, error) {
+	weightedSlice, err := toWeightedSlice(targets)
 	if err != nil {
 		return nil, err
 	}
 
 	index := selectFromWeightedSlice(weightedSlice)
 
-	return routes[index], nil
+	return targets[index], nil
 }
 
-func toWeightedSlice(routes []*aiv1alpha1.RouteDestination) ([]uint32, error) {
+func toWeightedSlice(targets []*aiv1alpha1.TargetModel) ([]uint32, error) {
 	var isWeighted bool
-	if routes[0].Weight != nil {
+	if targets[0].Weight != nil {
 		isWeighted = true
 	}
 
-	res := make([]uint32, len(routes))
+	res := make([]uint32, len(targets))
 
-	for i, route := range routes {
-		if (isWeighted && route.Weight == nil) || (!isWeighted && route.Weight != nil) {
-			return nil, fmt.Errorf("the weight field in routes must be either fully specified or not specified")
+	for i, target := range targets {
+		if (isWeighted && target.Weight == nil) || (!isWeighted && target.Weight != nil) {
+			return nil, fmt.Errorf("the weight field in targetModel must be either fully specified or not specified")
 		}
 
 		if isWeighted {
-			res[i] = *route.Weight
+			res[i] = *target.Weight
 		} else {
 			// If weight is not specified, set to 1.
 			res[i] = 1
@@ -113,23 +113,18 @@ func selectFromWeightedSlice(weights []uint32) int {
 	return 0
 }
 
-func (m *modelRouterImpl) UpdateRoute(models []string, rules []*aiv1alpha1.Rule) error {
-	fmt.Printf("UpdateRoute models: %v\n", models)
+func (m *modelRouterImpl) UpdateRoute(model string, rules []*aiv1alpha1.Rule) error {
+	fmt.Printf("UpdateRoute model: %v\n", model)
 
-	for _, model := range models {
-		m.routes[model] = rules
-	}
+	m.routes[model] = rules
 
 	return nil
 }
 
-func (m *modelRouterImpl) DeleteRoute(models []string) error {
-	fmt.Printf("DeleteRoute models: %v\n", models)
+func (m *modelRouterImpl) DeleteRoute(model string) error {
+	fmt.Printf("DeleteRoute model: %v\n", model)
 
-	for _, model := range models {
-		// TODO: consider a mode configured in multiple VirtualModel?
-		delete(m.routes, model)
-	}
+	delete(m.routes, model)
 
 	return nil
 }

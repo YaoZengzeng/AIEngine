@@ -1,0 +1,9 @@
+apiVersion: ai.kmesh.net/v1alpha1
+kind: ModelServer
+metadata:
+  labels:
+    app.kubernetes.io/name: aiengine
+    app.kubernetes.io/managed-by: kustomize
+  name: modelserver-sample
+spec:
+  # TODO(user): Add fields here

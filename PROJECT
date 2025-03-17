@@ -35,4 +35,22 @@ resources:
   kind: TargetModel
   path: AIEngine/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kmesh.net
+  group: ai
+  kind: ModelRoute
+  path: AIEngine/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kmesh.net
+  group: ai
+  kind: ModelServer
+  path: AIEngine/api/v1alpha1
+  version: v1alpha1
 version: "3"

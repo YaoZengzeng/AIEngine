@@ -20,14 +20,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TargetModelSpec defines the desired state of TargetModel.
-type TargetModelSpec struct {
-	Name             string            `json:"name"`
-	Hostname         string            `json:"hostname,omitempty"`
-	WorkloadSelector *WorkloadSelector `json:"workloadSelector,omitempty"`
+// ModelServerSpec defines the desired state of ModelServer.
+type ModelServerSpec struct {
+	WorkloadSelector *WorkloadSelector `json:"workloadSelector"`
 	TrafficPolicy    *TrafficPolicy    `json:"trafficPolicy,omitempty"`
 	Subsets          []*Subset         `json:"subsets,omitempty"`
-	Loras            []*Lora           `json:"loras,omitempty"`
 }
 
 type WorkloadSelector struct {
@@ -35,19 +32,14 @@ type WorkloadSelector struct {
 }
 
 type TrafficPolicy struct {
-	LoadBalancer *LoadBalancerSettings `json:"loadBalancer,omitempty"`
+	// LoadBalancer *LoadBalancerSettings `json:"loadBalancer,omitempty"`
+	Timeout *metav1.Duration `json:"timeout,omitempty"`
+	Retry   *Retry           `json:"retry,omitempty"`
 }
 
-type LoadBalancerSettings struct {
-	Simple SimpleLBPolicy `json:"simple,omitempty"`
+type Retry struct {
+	Attempts int32 `json:"attempts"`
 }
-
-type SimpleLBPolicy int32
-
-const (
-	RANDOM      SimpleLBPolicy = 0
-	ROUND_ROBIN SimpleLBPolicy = 1
-)
 
 type Subset struct {
 	Name          string            `json:"name"`
@@ -55,13 +47,8 @@ type Subset struct {
 	TrafficPolicy *TrafficPolicy    `json:"trafficPolicy,omitempty"`
 }
 
-type Lora struct {
-	Name          string         `json:"name"`
-	TrafficPolicy *TrafficPolicy `json:"trafficPolicy,omitempty"`
-}
-
-// TargetModelStatus defines the observed state of TargetModel.
-type TargetModelStatus struct {
+// ModelServerStatus defines the observed state of ModelServer.
+type ModelServerStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -69,24 +56,24 @@ type TargetModelStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// TargetModel is the Schema for the targetmodels API.
-type TargetModel struct {
+// ModelServer is the Schema for the modelservers API.
+type ModelServer struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   TargetModelSpec   `json:"spec,omitempty"`
-	Status TargetModelStatus `json:"status,omitempty"`
+	Spec   ModelServerSpec   `json:"spec,omitempty"`
+	Status ModelServerStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// TargetModelList contains a list of TargetModel.
-type TargetModelList struct {
+// ModelServerList contains a list of ModelServer.
+type ModelServerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []TargetModel `json:"items"`
+	Items           []ModelServer `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&TargetModel{}, &TargetModelList{})
+	SchemeBuilder.Register(&ModelServer{}, &ModelServerList{})
 }

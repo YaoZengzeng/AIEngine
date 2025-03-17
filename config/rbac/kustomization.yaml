@@ -22,6 +22,10 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the Project itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- modelserver_editor_role.yaml
+- modelserver_viewer_role.yaml
+- modelroute_editor_role.yaml
+- modelroute_viewer_role.yaml
 - targetmodel_editor_role.yaml
 - targetmodel_viewer_role.yaml
 - virtualmodel_editor_role.yaml
