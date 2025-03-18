@@ -22,9 +22,16 @@ import (
 
 // ModelServerSpec defines the desired state of ModelServer.
 type ModelServerSpec struct {
+	// The backend model that is actually accessed. For access to the model adapter,
+	// it should be the base model where the model adapter is located. For other scenarios,
+	// if model name is different from this field, it should be overwritten by this field.
+	Model string `json:"model"` // Rename to `Base model`?
+	// The inference engine used to manage the model.
+	InferenceEngine string `json:"inferenceEngine"`
+	// Used to select pods where the model is located.
 	WorkloadSelector *WorkloadSelector `json:"workloadSelector"`
-	TrafficPolicy    *TrafficPolicy    `json:"trafficPolicy,omitempty"`
-	Subsets          []*Subset         `json:"subsets,omitempty"`
+	// Traffic Policy for accessing the model.
+	TrafficPolicy *TrafficPolicy `json:"trafficPolicy,omitempty"`
 }
 
 type WorkloadSelector struct {
@@ -39,12 +46,6 @@ type TrafficPolicy struct {
 
 type Retry struct {
 	Attempts int32 `json:"attempts"`
-}
-
-type Subset struct {
-	Name          string            `json:"name"`
-	Labels        map[string]string `json:"labels"`
-	TrafficPolicy *TrafficPolicy    `json:"trafficPolicy,omitempty"`
 }
 
 // ModelServerStatus defines the observed state of ModelServer.

@@ -12,7 +12,7 @@ spec:
       user-type:
         exact: premium
     targetModels:
-    - name: "deepseek-r1:7b"
+    - name: "deepseek-r1-7b"
   - name: "default"
     targetModels:
-    - name: "deepseek-r1:1.5b"
+    - name: "deepseek-r1-1-5b"

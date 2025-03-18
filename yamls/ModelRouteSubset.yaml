@@ -8,9 +8,7 @@ spec:
   ruels:
   - name: "deepseek-r1-route"
     targetModels:
-    - name: "deepseek-r1:1.5b"
-      subset: v1
+    - name: "deepseek-r1-7b"
       weight: 70
-    - name: "deepseek-r1:1.5b"
-      subset: v2
+    - name: "deepseek-r1-7b"
       weight: 30

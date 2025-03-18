@@ -4,11 +4,10 @@ metadata:
   name: deepseek
   namespace: ollama
 spec:
-  modelName: "deepseek-r1"
+  modelAdapters:
+  - "lora-A"
+  - "lora-B"
   ruels:
-  - name: "deepseek-r1-route"
+  - name: "lora-route"
     targetModels:
-    - name: "deepseek-r1:1.5b"
-      lora: "sql-expert-1"
-    - name: "deepseek-r1:1.5b"
-      lora: "sql-expert-2"
+    - name: "deepseek-r1-1-5b"

@@ -22,8 +22,14 @@ import (
 
 // ModelRouteSpec defines the desired state of ModelRoute.
 type ModelRouteSpec struct {
-	// The model name in the LLM request.
+	// `model` in the LLM request, it could be a base model name, model adapter name or even
+	// a virtual model name. This field is used to match scenarios other than model adapter name and
+	// this field could be empty, but it and  `ModelAdapters` can't both be empty.
 	ModelName string `json:"modelName"`
+
+	// `model` in the LLM request could be model adapter name,
+	// here is a list of Model Adapter Names to match.
+	ModelAdapters []string `json:"modelAdapters,omitemtpy"`
 
 	// An ordered list of route rules for LLM traffic. The first rule
 	// matching an incoming request will be used.
@@ -37,29 +43,29 @@ type ModelRouteSpec struct {
 
 type Rule struct {
 	Name string `json:"name,omitempty"`
-	// If no `modelMatches` is specified, it will be default route.
-	ModelMatches []*ModelMatch  `json:"modelMatches,omitempty"`
+	// If no `modelMatch` is specified, it will be default route.
+	ModelMatche  *ModelMatch    `json:"modelMatch,omitempty"`
 	TargetModels []*TargetModel `json:"targetModels"`
 }
 
 type ModelMatch struct {
-	// Implement the following, if necessary:
-	// Header: prefix, exact, regex
-	// Url
-	// Path
+	// Header to match: prefix, exact, regex
+	Headers map[string]*StringMatch `json:"headers,omitempty"`
+
+	// URI to match: prefix, exact, regex
+	Uri *StringMatch `json:"uri,omitempty"`
+
+	// More if necessary.
 }
 
 type TargetModel struct {
-	Name   string  `json:"name"`
-	Subset *string `json:"subset,omitempty"`
-	Lora   *string `json:"lora,omitempty"`
-	Weight *uint32 `json:"weight,omitempty"`
+	ModelServerName string  `json:"modelServerName"`
+	Weight          *uint32 `json:"weight,omitempty"`
 }
 
 type RateLimit struct {
 	TokensPerUnit uint32        `json:"tokensPerUnit"`
 	Unit          RateLimitUnit `json:"unit"`
-	Model         string        `json:"model,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=second;minute;hour;day;month
@@ -72,6 +78,12 @@ const (
 	Day    RateLimitUnit = "day"
 	Month  RateLimitUnit = "month"
 )
+
+type StringMatch struct {
+	Exact  *string `json:"exact,omitempty"`
+	Prefix *string `json:"prefix,omitempty"`
+	Regex  *string `json:"regex,omitempty"`
+}
 
 // ModelRouteStatus defines the observed state of ModelRoute.
 type ModelRouteStatus struct {
