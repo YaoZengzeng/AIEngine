@@ -8,5 +8,6 @@ spec:
     matchLabels:
       app: deepseek-r1-7b
   model: "deepseek-r1:7b"
+  inferenceEngine: "sglang"
   trafficPolicy:
     timeout: 10s

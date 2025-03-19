@@ -19,16 +19,20 @@ Model Adapter Route:
 
 - All in one binary, lightweight, minimal dependencies, user-friendly and easy to deploy.
 
-- Model Aware Routing to enable better scheduling of AI traffic and enhances inference performance.
-
 - Seamlessly compatible with various gateway infrastructures, whether based on Nginx, Envoy, or others.
+
+- Model Aware Routing based on metrics fetched from inference engine to enable better scheduling of AI traffic and enhances inference performance.
+
+- Lora Aware Load Balancing
+
+- Rich Load Balancing Algorithms: Session Affinity, Pefix Cache aware, KV Cache aware, Heterogeneous GPU hardware aware ...
 
 - Inference Engine Agnostic, compatible with mainstream frameworks such as vLLM, SGLang, TGI, and more.
 
-- Prefix Cache Aware Routing
+- Model Canary release or A/B testing
 
-- Canary LLM Inference
+- Authentication, Authorization and Rate Limiting by tokens
 
-- Authentication, Authorization and Rate Limiting
+- Support Gateway API and inference API from Kubernetes Community
 
 ...

@@ -4,7 +4,7 @@ metadata:
   name: deepseek
   namespace: ollama
 spec:
-  modelAdapters:
+  loraAdapters:
   - "lora-A"
   - "lora-B"
   ruels:

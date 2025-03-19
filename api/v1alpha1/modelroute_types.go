@@ -22,14 +22,14 @@ import (
 
 // ModelRouteSpec defines the desired state of ModelRoute.
 type ModelRouteSpec struct {
-	// `model` in the LLM request, it could be a base model name, model adapter name or even
+	// `model` in the LLM request, it could be a base model name, lora adapter name or even
 	// a virtual model name. This field is used to match scenarios other than model adapter name and
 	// this field could be empty, but it and  `ModelAdapters` can't both be empty.
 	ModelName string `json:"modelName"`
 
-	// `model` in the LLM request could be model adapter name,
-	// here is a list of Model Adapter Names to match.
-	ModelAdapters []string `json:"modelAdapters,omitemtpy"`
+	// `model` in the LLM request could be lora adapter name,
+	// here is a list of Lora Adapter Names to match.
+	LoraAdapters []string `json:"loraAdapters,omitemtpy"`
 
 	// An ordered list of route rules for LLM traffic. The first rule
 	// matching an incoming request will be used.
