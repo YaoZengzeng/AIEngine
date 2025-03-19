@@ -3,7 +3,17 @@ AI Gateway Engine of Kmesh.
 
 Only POC, to be merged into the main repo later.
 
+Architecture:
+
 ![arch](./pic/arch.png)
+
+Base Model Route:
+
+![base_model_route](./pic/base-model-route.png)
+
+Model Adapter Route:
+
+![lora_route](./pic/lora-route.png)
 
 ### Features
 

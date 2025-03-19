@@ -1,5 +1,5 @@
 apiVersion: ai.kmesh.net/v1alpha1
-kind: TargetModel
+kind: ModelServer
 metadata:
   name: deepseek-r1-7b
   namespace: ollama
@@ -7,13 +7,6 @@ spec:
   workloadSelector:
     matchLabels:
       app: deepseek-r1-7b
-  name: "deepseek-r1:7b"
+  model: "deepseek-r1:7b"
   trafficPolicy:
     timeout: 10s
-  subsets:
-  - name: "v1"
-    labels:
-      version: v1
-  - name: "v2"
-    labels:
-      version: v2
