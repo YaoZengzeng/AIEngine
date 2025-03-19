@@ -10,3 +10,35 @@ spec:
   model: "deepseek-r1:1.5b"
   trafficPolicy:
     timeout: 10s
+
+---
+
+apiVersion: ai.kmesh.net/v1alpha1
+kind: ModelServer
+metadata:
+  name: deepseek-r1-1-5b-v1
+  namespace: ollama
+spec:
+  workloadSelector:
+    matchLabels:
+      app: deepseek-r1-1-5b
+      version: v1
+  model: "deepseek-r1:1.5b"
+  trafficPolicy:
+    timeout: 10s
+
+---
+
+apiVersion: ai.kmesh.net/v1alpha1
+kind: ModelServer
+metadata:
+  name: deepseek-r1-1-5b-v2
+  namespace: ollama
+spec:
+  workloadSelector:
+    matchLabels:
+      app: deepseek-r1-1-5b
+      version: v2
+  model: "deepseek-r1:1.5b"
+  trafficPolicy:
+    timeout: 10s
