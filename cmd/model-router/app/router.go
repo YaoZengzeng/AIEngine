@@ -9,8 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Starts http router
-func startHttpRouter(stop <-chan struct{}) {
+// Starts router
+func startRouter(stop <-chan struct{}) {
 	// Your application logic here
 	engine := gin.Default()
 	// TODO: add middle ware
@@ -25,8 +25,11 @@ func startHttpRouter(stop <-chan struct{}) {
 		})
 	})
 
+	r := router.NewRouter()
+	go r.Run(stop)
+
 	// vllm use /v1 prefix, not sure other frameworks
-	engine.Any("/v1", router.NewRouter().HandlerFunc())
+	engine.Any("/v1", r.HandlerFunc())
 
 	// TODO: customize the port
 	go engine.Run(":8080")

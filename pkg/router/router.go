@@ -6,13 +6,37 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
+	ctrl "sigs.k8s.io/controller-runtime"
+
+	aiv1alpha1 "AIEngine/api/v1alpha1"
+	"AIEngine/internal/controller"
+	"AIEngine/internal/limiter/redis"
+	"AIEngine/internal/picker"
+	"AIEngine/internal/router"
 )
+
+var (
+	scheme = runtime.NewScheme()
+)
+
+func init() {
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+
+	utilruntime.Must(aiv1alpha1.AddToScheme(scheme))
+	// +kubebuilder:scaffold:scheme
+}
 
 type Router struct {
 	// Define the fields of the Router struct here
+	modelRouteController  *controller.ModelRouteReconciler
+	modelServerController *controller.ModelServerReconciler
 }
 
 var _ gin.HandlerFunc
@@ -22,12 +46,64 @@ func NewRouter() *Router {
 }
 
 func (r *Router) Run(stop <-chan struct{}) {
-	// Your application logic here
-
-	// start router
-
 	// start controller
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme: scheme,
+	})
+	if err != nil {
+		fmt.Printf("Unable to start manager")
+		os.Exit(1)
+	}
 
+	limiter, err := redis.NewRateLimiter()
+	if err != nil {
+		fmt.Printf("unable to construct rate limiter")
+		os.Exit(1)
+	}
+
+	picker, err := picker.NewEndpointPicker()
+	if err != nil {
+		fmt.Printf("unable to construct endpoint picker")
+		os.Exit(1)
+	}
+
+	router, err := router.NewModelRouter()
+	if err != nil {
+		fmt.Printf("unable to constrcut model router")
+		os.Exit(1)
+	}
+
+	mrc := (&controller.ModelRouteReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+
+		ResourceToModels: make(map[string]string),
+
+		ModelRouter:    router,
+		EndpointPicker: picker,
+		RateLimiter:    limiter,
+	})
+
+	if mrc.SetupWithManager(mgr); err != nil {
+		fmt.Printf("Unable to start Model Route Controller: %v", err)
+		os.Exit(1)
+	}
+	r.modelRouteController = mrc
+
+	msc := &controller.ModelServerReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}
+
+	if err := msc.SetupWithManager(mgr); err != nil {
+		fmt.Printf("Unable to start Model Server Controller: %v", err)
+		os.Exit(1)
+	}
+	r.modelServerController = msc
+
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		fmt.Printf("Unable to start manager: %v", err)
+	}
 }
 
 type ModelRequest map[string]interface{}
