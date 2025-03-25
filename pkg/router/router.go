@@ -17,9 +17,6 @@ import (
 
 	aiv1alpha1 "AIEngine/api/v1alpha1"
 	"AIEngine/internal/controller"
-	"AIEngine/internal/limiter/redis"
-	"AIEngine/internal/picker"
-	"AIEngine/internal/router"
 )
 
 var (
@@ -55,33 +52,12 @@ func (r *Router) Run(stop <-chan struct{}) {
 		os.Exit(1)
 	}
 
-	limiter, err := redis.NewRateLimiter()
-	if err != nil {
-		fmt.Printf("unable to construct rate limiter")
-		os.Exit(1)
-	}
-
-	picker, err := picker.NewEndpointPicker()
-	if err != nil {
-		fmt.Printf("unable to construct endpoint picker")
-		os.Exit(1)
-	}
-
-	router, err := router.NewModelRouter()
-	if err != nil {
-		fmt.Printf("unable to constrcut model router")
-		os.Exit(1)
-	}
-
 	mrc := (&controller.ModelRouteReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 
 		ResourceToModels: make(map[string]string),
-
-		ModelRouter:    router,
-		EndpointPicker: picker,
-		RateLimiter:    limiter,
+		Routes:           make(map[string][]*aiv1alpha1.Rule),
 	})
 
 	if mrc.SetupWithManager(mgr); err != nil {
@@ -130,6 +106,12 @@ func (r *Router) HandlerFunc() gin.HandlerFunc {
 		fmt.Printf("Model name is %v\n", modelName)
 
 		// find the ModelRoute, and get the endpoint model and address
+		modelServerName, err := r.modelRouteController.Process(modelName)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, fmt.Sprintf("can't find corresponding model server: %v", err))
+		}
+
+		fmt.Printf("Model Server Name is %v\n", modelServerName)
 
 		// according to modelRequest.Model, route to different model
 		// call scheduler to select a model

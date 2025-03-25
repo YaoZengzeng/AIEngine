@@ -18,16 +18,10 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
+	"math/rand"
+	"time"
 
-	envoy_api_v3_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
-	envoy_service_proc_v3 "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
-	v32 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
-	"github.com/tmc/langchaingo/llms"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -35,9 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	aiv1alpha1 "AIEngine/api/v1alpha1"
-	"AIEngine/internal/limiter"
-	"AIEngine/internal/picker"
-	"AIEngine/internal/router"
 )
 
 // ModelRouteReconciler reconciles a ModelRoute object
@@ -46,12 +37,7 @@ type ModelRouteReconciler struct {
 	Scheme *runtime.Scheme
 
 	ResourceToModels map[string]string
-
-	ModelRouter router.ModelRouter
-
-	EndpointPicker picker.EndpointPicker
-
-	RateLimiter limiter.RateLimiter
+	Routes           map[string][]*aiv1alpha1.Rule
 }
 
 type Request struct {
@@ -80,7 +66,7 @@ func (r *ModelRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := r.Get(ctx, req.NamespacedName, &mr); err != nil {
 		if apierrors.IsNotFound(err) {
 			model := r.GetFromResourceMap(req.NamespacedName.String())
-			if err := r.ModelRouter.DeleteRoute(model); err != nil {
+			if err := r.DeleteRoute(model); err != nil {
 				fmt.Printf("failed to delete route: %v", err)
 				return ctrl.Result{}, nil
 			}
@@ -94,16 +80,9 @@ func (r *ModelRouteReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	r.SetForResourceMap(req.NamespacedName.String(), mr.Spec.ModelName)
 
-	if err := r.ModelRouter.UpdateRoute(mr.Spec.ModelName, mr.Spec.Rules); err != nil {
+	if err := r.UpdateRoute(mr.Spec.ModelName, mr.Spec.Rules); err != nil {
 		log.Error(err, "failed to update ModelRouter")
 		return ctrl.Result{}, err
-	}
-
-	if mr.Spec.RateLimit != nil {
-		if err := r.RateLimiter.UpdateConfig(&limiter.RateLimitConfig{Model: mr.Spec.ModelName, TokensPerUnit: mr.Spec.RateLimit.TokensPerUnit, Unit: string(mr.Spec.RateLimit.Unit)}); err != nil {
-			log.Error(err, "failed to update config of RateLimiter")
-			return ctrl.Result{}, err
-		}
 	}
 
 	return ctrl.Result{}, nil
@@ -117,6 +96,106 @@ func (r *ModelRouteReconciler) SetForResourceMap(namespacedName string, model st
 	r.ResourceToModels[namespacedName] = model
 }
 
+func (m *ModelRouteReconciler) Process(model string) (string, error) {
+	rules, ok := m.Routes[model]
+	if !ok {
+		return "", fmt.Errorf("not found route rules for model %s", model)
+	}
+
+	rule, err := m.selectRule(model, rules)
+	if err != nil {
+		return "", fmt.Errorf("failed to select route rule: %v", err)
+	}
+
+	dst, err := m.selectDestination(rule.TargetModels)
+	if err != nil {
+		return "", fmt.Errorf("failed to select destination: %v", err)
+	}
+
+	return dst.ModelServerName, nil
+}
+
+func (m *ModelRouteReconciler) selectRule(model string, rules []*aiv1alpha1.Rule) (*aiv1alpha1.Rule, error) {
+	// For POC, directly use the first rule.
+	if len(rules) == 0 || len(rules[0].TargetModels) == 0 {
+		return nil, fmt.Errorf("empty rules or target models")
+	}
+
+	return rules[0], nil
+}
+
+func (m *ModelRouteReconciler) selectDestination(targets []*aiv1alpha1.TargetModel) (*aiv1alpha1.TargetModel, error) {
+	weightedSlice, err := toWeightedSlice(targets)
+	if err != nil {
+		return nil, err
+	}
+
+	index := selectFromWeightedSlice(weightedSlice)
+
+	return targets[index], nil
+}
+
+func toWeightedSlice(targets []*aiv1alpha1.TargetModel) ([]uint32, error) {
+	var isWeighted bool
+	if targets[0].Weight != nil {
+		isWeighted = true
+	}
+
+	res := make([]uint32, len(targets))
+
+	for i, target := range targets {
+		if (isWeighted && target.Weight == nil) || (!isWeighted && target.Weight != nil) {
+			return nil, fmt.Errorf("the weight field in targetModel must be either fully specified or not specified")
+		}
+
+		if isWeighted {
+			res[i] = *target.Weight
+		} else {
+			// If weight is not specified, set to 1.
+			res[i] = 1
+		}
+	}
+
+	return res, nil
+}
+
+func selectFromWeightedSlice(weights []uint32) int {
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	totalWeight := 0
+	for _, weight := range weights {
+		totalWeight += int(weight)
+	}
+
+	randomNum := rng.Intn(totalWeight)
+
+	for i, weight := range weights {
+		randomNum -= int(weight)
+		if randomNum < 0 {
+			return i
+		}
+	}
+
+	return 0
+}
+
+func (m *ModelRouteReconciler) UpdateRoute(model string, rules []*aiv1alpha1.Rule) error {
+	fmt.Printf("UpdateRoute model: %v\n", model)
+
+	m.Routes[model] = rules
+
+	return nil
+}
+
+func (m *ModelRouteReconciler) DeleteRoute(model string) error {
+	fmt.Printf("DeleteRoute model: %v\n", model)
+
+	delete(m.Routes, model)
+
+	return nil
+}
+
+/*
 func (r *ModelRouteReconciler) Process(srv envoy_service_proc_v3.ExternalProcessor_ProcessServer) error {
 	fmt.Printf("--- Calling ModelRouteReconciler Process\n")
 
@@ -328,7 +407,7 @@ func (r *ModelRouteReconciler) Process(srv envoy_service_proc_v3.ExternalProcess
 			fmt.Printf("send error %v", err)
 		}
 	}
-}
+}*/
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ModelRouteReconciler) SetupWithManager(mgr ctrl.Manager) error {

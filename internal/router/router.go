@@ -6,7 +6,6 @@ import (
 	"time"
 
 	aiv1alpha1 "AIEngine/api/v1alpha1"
-	"AIEngine/internal/proxy"
 )
 
 type ModelRouter interface {
@@ -18,16 +17,10 @@ type ModelRouter interface {
 
 type modelRouterImpl struct {
 	routes map[string][]*aiv1alpha1.Rule
-
-	proxy proxy.Proxy
 }
 
 func NewModelRouter() (ModelRouter, error) {
-	proxy, err := proxy.NewProxy()
-	if err != nil {
-		return nil, fmt.Errorf("failed to construct proxy")
-	}
-	return &modelRouterImpl{routes: make(map[string][]*aiv1alpha1.Rule), proxy: proxy}, nil
+	return &modelRouterImpl{routes: make(map[string][]*aiv1alpha1.Rule)}, nil
 }
 
 func (m *modelRouterImpl) Route(model string) (*aiv1alpha1.TargetModel, error) {
