@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 
@@ -17,6 +18,7 @@ import (
 
 	aiv1alpha1 "AIEngine/api/v1alpha1"
 	"AIEngine/internal/controller"
+	"AIEngine/pkg/scheduler"
 )
 
 var (
@@ -34,6 +36,8 @@ type Router struct {
 	// Define the fields of the Router struct here
 	modelRouteController  *controller.ModelRouteReconciler
 	modelServerController *controller.ModelServerReconciler
+
+	scheduler scheduler.Scheduler
 }
 
 var _ gin.HandlerFunc
@@ -80,6 +84,8 @@ func (r *Router) Run(stop <-chan struct{}) {
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		fmt.Printf("Unable to start manager: %v", err)
 	}
+
+	r.scheduler = scheduler.NewScheduler()
 }
 
 type ModelRequest map[string]interface{}
@@ -115,13 +121,27 @@ func (r *Router) HandlerFunc() gin.HandlerFunc {
 
 		// according to modelRequest.Model, route to different model
 		// call scheduler to select a model
+		pods, err := r.modelServerController.Process(modelServerName)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, fmt.Sprintf("can't find target pods of model server: %v", modelServerName))
+		}
 
 		// call scheduler.ScheduleInference
-		var endpointAddr string
+		targetPod, err := r.scheduler.ScheduleInference(c.Request, pods)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, fmt.Sprintf("can't schedule to target pod: %v", err))
+		}
 
 		req := c.Request
+
+		original := req.URL.Host
+		_, port, err := net.SplitHostPort(original)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, fmt.Sprintf("failed to split host and port from url host: %v", err))
+		}
+
 		// step 1: change request URL to real server URL.
-		req.URL.Host = endpointAddr
+		req.URL.Host = fmt.Sprintf("%s:%s", targetPod.Status.PodIP, port)
 
 		// step 2: use http.Transport to do request to real server.
 		transport := http.DefaultTransport

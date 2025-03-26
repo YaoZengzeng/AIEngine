@@ -45,7 +45,7 @@ type ModelServerReconciler struct {
 	PodMapping sync.Map
 }
 
-func (r *ModelServerReconciler) UpdatePodMapping(key types.NamespacedName, pods []corev1.Pod) {
+func (r *ModelServerReconciler) UpdatePodMapping(key string, pods []*corev1.Pod) {
 	fmt.Printf("ModelServer is %v, pods: \n", key)
 	for _, pod := range pods {
 		fmt.Printf("%v\n", pod.Name)
@@ -54,9 +54,9 @@ func (r *ModelServerReconciler) UpdatePodMapping(key types.NamespacedName, pods 
 	r.PodMapping.Store(key, pods)
 }
 
-func (r *ModelServerReconciler) GetPodsFromModel(key types.NamespacedName) []corev1.Pod {
+func (r *ModelServerReconciler) GetPodsFromModel(key string) []*corev1.Pod {
 	if val, ok := r.PodMapping.Load(key); ok {
-		return val.([]corev1.Pod)
+		return val.([]*corev1.Pod)
 	}
 
 	return nil
@@ -89,12 +89,17 @@ func (r *ModelServerReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, fmt.Errorf("invalid selector: %v", err)
 	}
 
-	var pods corev1.PodList
-	if err := r.List(ctx, &pods, client.InNamespace(req.Namespace), client.MatchingLabelsSelector{Selector: selector}); err != nil {
+	var podList corev1.PodList
+	if err := r.List(ctx, &podList, client.InNamespace(req.Namespace), client.MatchingLabelsSelector{Selector: selector}); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	r.UpdatePodMapping(req.NamespacedName, pods.Items)
+	pods := make([]*corev1.Pod, 0, len(podList.Items))
+	for i := range podList.Items {
+		pods = append(pods, &podList.Items[i])
+	}
+
+	r.UpdatePodMapping(req.NamespacedName.String(), pods)
 
 	return ctrl.Result{}, nil
 }
@@ -130,4 +135,8 @@ func (r *ModelServerReconciler) podEventHandler(ctx context.Context, obj client.
 	}
 
 	return requests
+}
+
+func (r *ModelServerReconciler) Process(modelServerName string) ([]*corev1.Pod, error) {
+	return r.GetPodsFromModel(modelServerName), nil
 }
